@@ -84,6 +84,64 @@
   font-weight: 500;
 }
 
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-left: var(--sp-4);
+  margin-left: var(--sp-2);
+  border-left: 1px solid rgba(255,255,255,0.12);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  text-align: right;
+}
+
+.userName {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-white);
+}
+
+.userRole {
+  font-family: var(--font-body);
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  border: 1px solid rgba(255,255,255,0.14);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.logoutBtn:hover,
+.logoutBtn:focus-visible {
+  background: rgba(255,255,255,0.1);
+  color: var(--c-white);
+  outline: 2px solid var(--brand-cyan);
+  outline-offset: 1px;
+}
+
+@media (max-width: 640px) {
+  .userInfo { display: none; }
+  .topbar { gap: var(--sp-4); padding: 0 var(--sp-3); }
+}
+
 .liveDot {
   width: 7px;
   height: 7px;

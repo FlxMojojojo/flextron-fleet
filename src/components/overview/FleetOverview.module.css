@@ -169,25 +169,40 @@
   height: 100%;
 }
 
-/* Marker styles injected via JS */
+/* Branded marker: Flextron icon in a status-colored ring */
 :global(.bike-marker) {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 2.5px solid white;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  background: var(--c-white);
+  border: 2.5px solid var(--c-offline);
+  box-shadow: 0 2px 8px rgba(10,26,47,0.28);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-:global(.bike-marker:hover) { transform: scale(1.15); }
-:global(.bike-marker.ok)       { background: #0E9F6E; }
-:global(.bike-marker.charging) { background: #1E5BFF; }
-:global(.bike-marker.alert)    { background: #C2410C; animation: ring-pulse 1.5s infinite; }
-:global(.bike-marker.offline)  { background: #94A3B8; }
+:global(.bike-marker .bike-marker-icon) {
+  width: 18px;
+  height: 20px;
+  object-fit: contain;
+  pointer-events: none;
+  display: block;
+}
+
+:global(.bike-marker:hover),
+:global(.bike-marker:focus-visible) {
+  transform: scale(1.15);
+  box-shadow: 0 4px 14px rgba(10,26,47,0.35);
+  outline: none;
+}
+
+:global(.bike-marker.ok)       { border-color: #0E9F6E; }
+:global(.bike-marker.charging) { border-color: #1E5BFF; }
+:global(.bike-marker.alert)    { border-color: #C2410C; animation: ring-pulse 1.5s infinite; }
+:global(.bike-marker.offline)  { border-color: #94A3B8; opacity: 0.7; }
 
 :global(.maplibregl-popup-content) {
   font-family: var(--font-body);

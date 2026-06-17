@@ -12,6 +12,32 @@ npm run dev
 
 Open http://localhost:5173
 
+## Login
+
+The app requires authentication. On first boot a default **admin** is seeded:
+
+| Username | Password |
+|----------|----------|
+| `admin`  | `flextron-admin` |
+
+(Override via `DEFAULT_ADMIN_USERNAME` / `DEFAULT_ADMIN_PASSWORD` before first run.)
+
+- **Admins** see a **Users** tab to create/delete users and other admins.
+- **Users** can view the fleet but not manage accounts.
+- Accounts persist to `<FLEET_DATA_DIR>/users.json`; sessions are signed tokens
+  (7-day expiry). Change the seeded admin password after first login by creating
+  a new admin and deleting the default.
+
+### Auth API
+| Method | Endpoint | Access |
+|--------|----------|--------|
+| `POST` | `/api/auth/login` | public — `{username, password}` → `{token, user}` |
+| `GET`  | `/api/auth/me` | any logged-in user |
+| `GET`/`POST` | `/api/users` | admin only |
+| `DELETE` | `/api/users/:id` | admin only |
+
+All telemetry endpoints require `Authorization: Bearer <token>`.
+
 ## Architecture
 
 ```

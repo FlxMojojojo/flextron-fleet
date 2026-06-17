@@ -1,11 +1,18 @@
 .root {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background: var(--c-surf-2);
   padding: var(--sp-6);
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+}
+
+/* Prevent flex from compressing sections (e.g. the instrument cluster)
+   to fit the viewport — let the page scroll instead. */
+.root > * {
+  flex-shrink: 0;
 }
 
 /* ── Header ── */
