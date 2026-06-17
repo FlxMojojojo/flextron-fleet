@@ -164,7 +164,7 @@ export function BikeDetail() {
       {/* Cell voltage chart */}
       <section className={s.card}>
         <h2 className={s.cardTitle}>
-          Cell Voltages (20 cells)
+          Cell Voltages ({can.cell_voltages.length} cells)
           {v.cell_delta > 0.1 && <span className={s.outlierBadge}>⚠ Imbalance detected</span>}
         </h2>
         <CellChart cells={can.cell_voltages} cellDelta={v.cell_delta} />

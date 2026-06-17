@@ -61,6 +61,9 @@ interface InternalRecord {
 
 const store = new Map<string, InternalRecord>();
 
+// A vehicle is considered offline if no telemetry arrives within this window.
+const OFFLINE_AFTER_MS = (Number(process.env.OFFLINE_AFTER_SEC) || 60) * 1000;
+
 function deriveStatus(can: CanTelemetry, forced?: VehicleStatus): VehicleStatus {
   if (forced === 'offline') return 'offline';
   if (can.hv_critical_alert || can.battery_high_temp_telltale || (can.max_v - can.min_v) > 0.3) return 'alert';
@@ -71,11 +74,12 @@ function deriveStatus(can: CanTelemetry, forced?: VehicleStatus): VehicleStatus 
 function toVehicleState(id: string, rec: InternalRecord): VehicleState {
   const cellDelta = parseFloat((rec.can.max_v - rec.can.min_v).toFixed(3));
   const now = Date.now();
+  const stale = now - rec.can.ts > OFFLINE_AFTER_MS;
   return {
     vehicleno: id,
     can: rec.can,
     gps: rec.gps,
-    status: deriveStatus(rec.can, rec.forcedStatus),
+    status: stale ? 'offline' : deriveStatus(rec.can, rec.forcedStatus),
     cell_delta: cellDelta,
     last_seen: rec.can.ts,
     hours_since_charge: rec.lastChargeTs == null ? null : parseFloat(((now - rec.lastChargeTs) / 3_600_000).toFixed(2)),
@@ -275,9 +279,29 @@ function num(v: unknown, fallback = 0): number {
   const n = typeof v === 'string' ? parseFloat(v) : (v as number);
   return Number.isFinite(n) ? n : fallback;
 }
-function onOff(v: unknown): boolean {
-  if (typeof v === 'string') return v.trim().toUpperCase() === 'ON' || v === '1';
-  return v === 1 || v === true;
+/** Flexible boolean: true/false, 1/0, "ON"/"OFF", "true"/"yes". */
+function flexBool(v: unknown, fallback = false): boolean {
+  if (v === undefined || v === null) return fallback;
+  if (typeof v === 'boolean') return v;
+  if (typeof v === 'number') return v === 1;
+  if (typeof v === 'string') {
+    const s = v.trim().toUpperCase();
+    return s === 'ON' || s === '1' || s === 'TRUE' || s === 'YES';
+  }
+  return fallback;
+}
+/** First defined value among candidate keys (supports clean + legacy names). */
+function firstDefined(c: Record<string, unknown>, keys: string[]): unknown {
+  for (const k of keys) if (c[k] !== undefined && c[k] !== null) return c[k];
+  return undefined;
+}
+function numKeys(c: Record<string, unknown>, keys: string[], fallback: number): number {
+  const v = firstDefined(c, keys);
+  return v === undefined ? fallback : num(v, fallback);
+}
+function boolKeys(c: Record<string, unknown>, keys: string[], fallback = false): boolean {
+  const v = firstDefined(c, keys);
+  return v === undefined ? fallback : flexBool(v, fallback);
 }
 
 /** Accepts the partner's wire format and reflects it on the dashboard. */
@@ -309,32 +333,52 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
 
   if (payload.type === 'can') {
     const c = payload.can;
-    const max_v = num(c['MaxV'], rec.can.max_v);
-    const min_v = num(c['MinV'], rec.can.min_v);
-    const charging = num(c['charging_status'], rec.can.charging_status);
+
+    // Cell voltages: prefer the device-provided array (supports any pack size,
+    // e.g. 20S or 24S). Fall back to synthesizing from min/max for legacy senders.
+    const rawCells = firstDefined(c, ['cell_voltages', 'cellVoltages', 'CellVoltages']);
+    let cells: number[];
+    if (Array.isArray(rawCells) && rawCells.length > 0) {
+      cells = rawCells.map(x => parseFloat(num(x).toFixed(3)));
+    } else {
+      cells = rec.can.cell_voltages.length ? rec.can.cell_voltages : buildCells(3.2, 3.4);
+    }
+
+    // Use provided max/min/sum if present, otherwise derive from the cells.
+    const provMax = firstDefined(c, ['max_v', 'MaxV']);
+    const provMin = firstDefined(c, ['min_v', 'MinV']);
+    const provSum = firstDefined(c, ['sum_voltage', 'SumVoltage']);
+    const max_v = provMax !== undefined ? num(provMax) : parseFloat(Math.max(...cells).toFixed(3));
+    const min_v = provMin !== undefined ? num(provMin) : parseFloat(Math.min(...cells).toFixed(3));
+    const sum_voltage = provSum !== undefined ? num(provSum)
+      : parseFloat(cells.reduce((a, b) => a + b, 0).toFixed(2));
+
+    const charging = numKeys(c, ['charging_status'], rec.can.charging_status);
     rec.can = {
       ...rec.can,
       vehicleno: id,
       ts: now,
-      soc: num(c['soc'], rec.can.soc),
-      sum_voltage: num(c['SumVoltage'], rec.can.sum_voltage),
+      soc: numKeys(c, ['soc'], rec.can.soc),
+      soh: numKeys(c, ['soh'], rec.can.soh),
+      cycle_count: numKeys(c, ['cycle_count'], rec.can.cycle_count),
+      sum_voltage,
       max_v, min_v,
-      cell_voltages: buildCells(min_v, max_v),
-      discharge_current: num(c['Discharge Current'], rec.can.discharge_current),
+      cell_voltages: cells,
+      discharge_current: numKeys(c, ['discharge_current', 'Discharge Current'], rec.can.discharge_current),
       charging_status: charging,
-      chg_mos: onOff(c['ChgMOS']),
-      dischg_mos: onOff(c['DisChgMOS']),
-      remain_cap: num(c['RemainCap'], rec.can.remain_cap),
-      dte: num(c['dte'], rec.can.dte),
-      odometer: num(c['odometer'], rec.can.odometer),
-      vehicle_speed: num(c['vehicle_speed'], rec.can.vehicle_speed),
-      fast_charge_indicator: num(c['fast_charge_indicator']) === 1,
-      battery_temp_1: num(c['battery_temp'], rec.can.battery_temp_1),
-      battery_temp_2: num(c['battery_temp 2'], rec.can.battery_temp_2),
-      battery_temp_3: num(c['battery_temp 3'], rec.can.battery_temp_3),
-      battery_temp_4: num(c['battery_temp 4'], rec.can.battery_temp_4),
-      battery_high_temp_telltale: num(c['battery_high_temp_telltale']) === 1,
-      hv_critical_alert: num(c['hv_critical_alert']) === 1,
+      chg_mos: boolKeys(c, ['chg_mos', 'ChgMOS'], rec.can.chg_mos),
+      dischg_mos: boolKeys(c, ['dischg_mos', 'DisChgMOS'], rec.can.dischg_mos),
+      remain_cap: numKeys(c, ['remain_cap', 'RemainCap'], rec.can.remain_cap),
+      dte: numKeys(c, ['dte'], rec.can.dte),
+      odometer: numKeys(c, ['odometer'], rec.can.odometer),
+      vehicle_speed: numKeys(c, ['vehicle_speed'], rec.can.vehicle_speed),
+      fast_charge_indicator: boolKeys(c, ['fast_charge_indicator'], rec.can.fast_charge_indicator),
+      battery_temp_1: numKeys(c, ['battery_temp_1', 'battery_temp'], rec.can.battery_temp_1),
+      battery_temp_2: numKeys(c, ['battery_temp_2', 'battery_temp 2'], rec.can.battery_temp_2),
+      battery_temp_3: numKeys(c, ['battery_temp_3', 'battery_temp 3'], rec.can.battery_temp_3),
+      battery_temp_4: numKeys(c, ['battery_temp_4', 'battery_temp 4'], rec.can.battery_temp_4),
+      battery_high_temp_telltale: boolKeys(c, ['battery_high_temp_telltale'], false),
+      hv_critical_alert: boolKeys(c, ['hv_critical_alert'], false),
     };
     rec.forcedStatus = undefined; // real data overrides any seeded forcing
     if (charging === 1) rec.lastChargeTs = now;
