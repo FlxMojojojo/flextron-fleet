@@ -4,7 +4,7 @@
  * standalone prod server. Set VITE_API_BASE_URL to point at an external host.
  */
 
-import type { VehicleState, HistoryMetric, TimeSeriesPoint } from '../types/telemetry';
+import type { VehicleState, HistoryMetric, TimeSeriesPoint, Owner, VehicleType } from '../types/telemetry';
 
 export const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
 
@@ -80,6 +80,27 @@ export function createUser(username: string, password: string, role: Role): Prom
 }
 export function deleteUser(id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+// ── Owners (bike customers) ──
+export interface OwnerInput {
+  name: string;
+  mobile: string;
+  purchase_date: string;
+  vehicle_type: VehicleType;
+  vehicleno: string;
+}
+export function listOwners(): Promise<Owner[]> {
+  return request<Owner[]>('/api/owners');
+}
+export function createOwner(input: OwnerInput): Promise<Owner> {
+  return request<Owner>('/api/owners', { method: 'POST', body: JSON.stringify(input) });
+}
+export function updateOwner(id: string, input: OwnerInput): Promise<Owner> {
+  return request<Owner>(`/api/owners/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(input) });
+}
+export function deleteOwner(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/owners/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 // ── Telemetry ──

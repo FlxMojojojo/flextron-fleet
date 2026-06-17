@@ -26,10 +26,15 @@ export function FleetOverview() {
     refetchInterval: 3000,
   });
 
-  const filtered = useMemo(() =>
-    vehicles.filter(v => v.vehicleno.toLowerCase().includes(search.toLowerCase())),
-    [vehicles, search],
-  );
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    if (!q) return vehicles;
+    return vehicles.filter(v =>
+      v.vehicleno.toLowerCase().includes(q) ||
+      v.owner?.name.toLowerCase().includes(q) ||
+      v.owner?.mobile.includes(q),
+    );
+  }, [vehicles, search]);
 
   const counts = useMemo(() => ({
     total:    vehicles.length,
@@ -76,7 +81,7 @@ export function FleetOverview() {
             <input
               className={s.searchInput}
               type="search"
-              placeholder="Search bike number…"
+              placeholder="Search bike no, owner, mobile…"
               value={search}
               onChange={e => setSearch(e.target.value)}
               aria-label="Search bikes by number"
@@ -98,7 +103,9 @@ export function FleetOverview() {
                   <StatusChip status={v.status} />
                 </div>
                 <SocBar soc={v.can.soc} />
-                <span className={s.lastSeen}>{timeAgo(v.last_seen)}</span>
+                <span className={s.lastSeen}>
+                  {v.owner ? `${v.owner.name} · ${v.owner.vehicle_type} · ` : ''}{timeAgo(v.last_seen)}
+                </span>
               </button>
             </li>
           ))}

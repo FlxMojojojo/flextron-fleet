@@ -13,6 +13,7 @@ import { BrandMark } from './components/shared/BrandMark';
 const BikeDetail = lazy(() => import('./components/detail/BikeDetail').then(m => ({ default: m.BikeDetail })));
 const AlertsPage = lazy(() => import('./components/alerts/AlertsPage').then(m => ({ default: m.AlertsPage })));
 const UsersPage = lazy(() => import('./components/admin/UsersPage').then(m => ({ default: m.UsersPage })));
+const OwnersPage = lazy(() => import('./components/owners/OwnersPage').then(m => ({ default: m.OwnersPage })));
 
 const qc = new QueryClient({
   defaultOptions: { queries: { staleTime: 2000, retry: 1, refetchOnWindowFocus: false } },
@@ -58,6 +59,7 @@ createRoot(document.getElementById('root')!).render(
               <Route index element={<FleetOverview />} />
               <Route path="bike/:id" element={lazyRoute(<BikeDetail />)} />
               <Route path="alerts" element={lazyRoute(<AlertsPage />)} />
+              <Route path="owners" element={lazyRoute(<OwnersPage />)} />
               <Route path="admin/users" element={<RequireAdmin>{lazyRoute(<UsersPage />)}</RequireAdmin>} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />

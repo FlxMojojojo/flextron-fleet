@@ -32,11 +32,18 @@ export function AppShell() {
             </svg>
             Alerts
           </NavLink>
+          <NavLink to="/owners" className={({ isActive }) => `${s.navLink}${isActive ? ' ' + s.active : ''}`}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <circle cx="7" cy="4" r="2.4" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M2 12.5C2 9.7 4.2 8 7 8s5 1.7 5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            Owners
+          </NavLink>
           {isAdmin && (
             <NavLink to="/admin/users" className={({ isActive }) => `${s.navLink}${isActive ? ' ' + s.active : ''}`}>
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                <circle cx="7" cy="4" r="2.4" stroke="currentColor" strokeWidth="1.4" />
-                <path d="M2 12.5C2 9.7 4.2 8 7 8s5 1.7 5 4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                <rect x="2" y="2" width="10" height="10" rx="2" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
               Users
             </NavLink>

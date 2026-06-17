@@ -59,10 +59,31 @@ export function BikeDetail() {
         </button>
         <div className={s.headerInfo}>
           <div className={s.bikeNo}>{v.vehicleno}</div>
-          <div className={s.lastUpdate}>Last update {fmt(v.last_seen)}</div>
+          <div className={s.lastUpdate}>
+            {v.owner ? <>Owner: <strong>{v.owner.name}</strong> · {v.owner.vehicle_type} · </> : null}
+            Last update {fmt(v.last_seen)}
+          </div>
         </div>
         <StatusChip status={v.status} />
       </div>
+
+      {/* Owner card */}
+      <section className={s.card}>
+        <h2 className={s.cardTitle}>Owner</h2>
+        {v.owner ? (
+          <div className={s.ownerGrid}>
+            <div className={s.ownerRow}><span className={s.ownerKey}>Name</span><span className={s.ownerVal}>{v.owner.name}</span></div>
+            <div className={s.ownerRow}><span className={s.ownerKey}>Mobile</span><span className={`${s.ownerVal} ${s.ownerMono}`}>{v.owner.mobile}</span></div>
+            <div className={s.ownerRow}><span className={s.ownerKey}>Purchase Date</span><span className={`${s.ownerVal} ${s.ownerMono}`}>{v.owner.purchase_date}</span></div>
+            <div className={s.ownerRow}><span className={s.ownerKey}>Vehicle Type</span><span className={s.ownerVal}>{v.owner.vehicle_type}</span></div>
+          </div>
+        ) : (
+          <p className={s.ownerEmpty}>
+            No owner mapped to this device.{' '}
+            <button className={s.ownerLink} onClick={() => navigate('/owners')}>Map an owner →</button>
+          </p>
+        )}
+      </section>
 
       {/* Instrument cluster */}
       <section className={s.cluster} aria-label="Instrument cluster">

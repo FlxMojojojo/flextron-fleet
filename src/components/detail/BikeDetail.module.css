@@ -205,6 +205,46 @@
   font-weight: 500;
 }
 
+/* ── Owner card ── */
+.ownerGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+}
+.ownerRow { display: flex; flex-direction: column; gap: 3px; }
+.ownerKey {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.ownerVal {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.ownerMono { font-family: var(--font-mono); font-weight: 500; }
+.ownerEmpty {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: #6B7F9A;
+}
+.ownerLink {
+  background: none; border: none; padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-blue);
+  cursor: pointer;
+}
+.ownerLink:hover { text-decoration: underline; }
+
+@media (max-width: 700px) {
+  .ownerGrid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ── Temperature sensors ── */
 .tempGrid {
   display: grid;

@@ -34,6 +34,19 @@ export interface GpsTelemetry {
 
 export type VehicleStatus = 'ok' | 'charging' | 'alert' | 'offline';
 
+export type VehicleType = '2W' | '3W';
+
+/** A bike owner / customer, manually mapped to one FLX IoT device. */
+export interface Owner {
+  id: string;
+  name: string;
+  mobile: string;
+  purchase_date: string; // ISO date 'YYYY-MM-DD'
+  vehicle_type: VehicleType;
+  vehicleno: string;     // mapped FLX device id
+  createdAt: number;
+}
+
 export interface VehicleState {
   vehicleno: string;
   can: CanTelemetry;
@@ -43,6 +56,7 @@ export interface VehicleState {
   last_seen: number;
   hours_since_charge: number | null; // hours since charging_status was last 1
   gps_distance_km: number;           // distance traveled, derived from GPS points only
+  owner?: Owner | null;              // mapped owner, attached by the API layer
 }
 
 export interface TimeSeriesPoint {

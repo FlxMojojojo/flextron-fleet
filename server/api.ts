@@ -17,7 +17,15 @@ import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
   listUsers, createUser, deleteUser, type User, type Role,
 } from './auth';
-import type { HistoryMetric } from '../src/types/telemetry';
+import {
+  initOwners, listOwners, createOwner, updateOwner, deleteOwner, getOwnerByVehicle,
+} from './owners';
+import type { HistoryMetric, VehicleState } from '../src/types/telemetry';
+
+/** Attach the mapped owner (if any) to a vehicle state. */
+function withOwner(v: VehicleState): VehicleState {
+  return { ...v, owner: getOwnerByVehicle(v.vehicleno) };
+}
 
 const INGEST_TOKEN = process.env.INGEST_TOKEN ?? '';
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*';
@@ -28,6 +36,7 @@ export function bootServices() {
   booted = true;
   startSimulation();
   initAuth();
+  initOwners();
 }
 
 function cors() {
@@ -150,9 +159,35 @@ export async function handleApi(
     }
   }
 
-  // ── Telemetry reads ──
+  // ── Owners (any authenticated user) ──
+  if (path === '/owners' || path.startsWith('/owners/')) {
+    if (method === 'GET' && path === '/owners') { sendJson(res, 200, listOwners()); return true; }
+
+    if (method === 'POST' && path === '/owners') {
+      try { sendJson(res, 201, createOwner(await readBody(req) as object)); }
+      catch (e) { sendJson(res, 400, { error: (e as Error).message }); }
+      return true;
+    }
+
+    const m = path.match(/^\/owners\/([^/]+)$/);
+    if (m) {
+      const id = decodeURIComponent(m[1]);
+      if (method === 'PUT') {
+        try { sendJson(res, 200, updateOwner(id, await readBody(req) as object)); }
+        catch (e) { sendJson(res, 400, { error: (e as Error).message }); }
+        return true;
+      }
+      if (method === 'DELETE') {
+        try { deleteOwner(id); sendJson(res, 200, { ok: true }); }
+        catch (e) { sendJson(res, 400, { error: (e as Error).message }); }
+        return true;
+      }
+    }
+  }
+
+  // ── Telemetry reads (enriched with owner) ──
   if (method === 'GET') {
-    if (path === '/vehicles') { sendJson(res, 200, getVehicles()); return true; }
+    if (path === '/vehicles') { sendJson(res, 200, getVehicles().map(withOwner)); return true; }
     const m = path.match(/^\/vehicles\/([^/]+)(\/history)?$/);
     if (m) {
       const id = decodeURIComponent(m[1]);
@@ -162,7 +197,7 @@ export async function handleApi(
         return true;
       }
       const v = getVehicle(id);
-      sendJson(res, v ? 200 : 404, v ?? { error: 'not found' });
+      sendJson(res, v ? 200 : 404, v ? withOwner(v) : { error: 'not found' });
       return true;
     }
   }
