@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { BrandLockup } from '../shared/BrandMark';
 import s from './AppShell.module.css';
 
 export function AppShell() {
@@ -6,15 +7,7 @@ export function AppShell() {
     <div className={s.shell}>
       <header className={s.topbar} role="banner">
         <NavLink to="/" className={s.brand} aria-label="Flextron Fleet Telemetry home">
-          <span className={s.brandMark} aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M2 12 L8 2 L14 12 H9 L8 14 L7 12 Z" fill="white" />
-            </svg>
-          </span>
-          <span>
-            <div className={s.brandName}>Flextron</div>
-            <div className={s.brandSub}>Fleet Telemetry</div>
-          </span>
+          <BrandLockup tone="light" tagline="Fleet Telemetry" markSize={30} />
         </NavLink>
 
         <nav className={s.nav} aria-label="Main navigation">

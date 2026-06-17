@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 134" width="120" height="134" role="img" aria-label="Flextron">
+  <defs>
+    <linearGradient id="flx-mark-grad" gradientUnits="userSpaceOnUse" x1="96" y1="2" x2="20" y2="132">
+      <stop offset="0" stop-color="#2DB7CB"/>
+      <stop offset="0.5" stop-color="#3A6FA8"/>
+      <stop offset="1" stop-color="#3B2A63"/>
+    </linearGradient>
+  </defs>
+  <!-- Top bar + tapering spine to point -->
+  <path d="M28 4 L116 4 L98 34 L54 34 L6 130 Z" fill="url(#flx-mark-grad)"/>
+  <!-- Middle lightning arm -->
+  <path d="M52 44 L104 44 L82 70 L100 70 L44 112 L64 76 L46 76 Z" fill="url(#flx-mark-grad)"/>
+</svg>

@@ -6,6 +6,7 @@ import './tokens/tokens.css';
 import './index.css';
 import { AppShell } from './components/shell/AppShell';
 import { FleetOverview } from './components/overview/FleetOverview';
+import { BrandMark } from './components/shared/BrandMark';
 
 // Code-split heavier routes (Recharts loads only when a detail/alerts view opens).
 const BikeDetail = lazy(() => import('./components/detail/BikeDetail').then(m => ({ default: m.BikeDetail })));
@@ -18,8 +19,13 @@ const qc = new QueryClient({
 });
 
 const Fallback = () => (
-  <div style={{ flex: 1, display: 'grid', placeItems: 'center', color: '#6B7F9A', fontFamily: 'Inter, sans-serif' }}>
-    Loading…
+  <div style={{ flex: 1, display: 'grid', placeItems: 'center', gap: 12 }}>
+    <div style={{ display: 'grid', placeItems: 'center', gap: 10, animation: 'dot-pulse 1.4s ease-in-out infinite' }}>
+      <BrandMark size={40} />
+      <span style={{ color: '#6B7F9A', fontFamily: 'Inter, sans-serif', fontSize: 13, letterSpacing: '0.04em' }}>
+        Loading…
+      </span>
+    </div>
   </div>
 );
 

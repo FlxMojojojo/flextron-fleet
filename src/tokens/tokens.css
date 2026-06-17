@@ -22,6 +22,13 @@
   --c-alert-bg:   #FFF1EE;
   --c-offline:    #94A3B8;
 
+  /* --- Flextron brand (logo) --- */
+  --brand-cyan:    #2DB7CB;
+  --brand-blue:    #3A6FA8;
+  --brand-purple:  #3B2A63;
+  --brand-ink:     #1E1638;  /* deep purple-navy, matches the wordmark */
+  --brand-gradient: linear-gradient(150deg, var(--brand-cyan) 0%, var(--brand-blue) 50%, var(--brand-purple) 100%);
+
   /* Status chip colors */
   --c-status-ok:        #0E9F6E;
   --c-status-ok-bg:     #ECFDF5;
