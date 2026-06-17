@@ -1,45 +1,47 @@
 /**
- * Flextron brand assets.
+ * Flextron brand assets — uses the official logo files in public/brand/.
  *
- * <BrandMark> — the lightning-bolt "F" icon (gradient cyan→purple).
- * <BrandLockup> — icon + "FLEXTRON" wordmark + product/tagline line.
- *
- * The mark is a faithful vector recreation of the official logo. To use the
- * exact brand export instead, drop it at public/flextron-mark.svg (favicon)
- * and replace the <svg> paths below — geometry is the only thing to swap.
+ * <BrandMark>   — the lightning-bolt "F" icon (public/brand/flextron-mark.png).
+ * <BrandLockup> — icon + "FLEXTRON" wordmark + product/tagline line, for the
+ *                 dark nav (the official full-color wordmark is dark-on-
+ *                 transparent, so on dark surfaces we set it in white here).
+ * <BrandLogoFull> — the official full lockup PNG, for light/print surfaces.
  */
 
-let gradSeq = 0;
+const MARK_SRC = '/brand/flextron-mark.png';
+const FULL_SRC = '/brand/flextron-logo-full.png';
+const MARK_RATIO = 604 / 534; // native icon height / width
 
 export function BrandMark({ size = 28, className }: { size?: number; className?: string }) {
-  // Unique gradient id per instance so multiple marks render correctly.
-  const id = `flx-grad-${gradSeq++}`;
   return (
-    <svg
+    <img
+      src={MARK_SRC}
       width={size}
-      height={(size * 134) / 120}
-      viewBox="0 0 120 134"
+      height={Math.round(size * MARK_RATIO)}
       className={className}
-      role="img"
-      aria-label="Flextron"
-    >
-      <defs>
-        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="96" y1="2" x2="20" y2="132">
-          <stop offset="0" stopColor="#2DB7CB" />
-          <stop offset="0.5" stopColor="#3A6FA8" />
-          <stop offset="1" stopColor="#3B2A63" />
-        </linearGradient>
-      </defs>
-      <path d="M28 4 L116 4 L98 34 L54 34 L6 130 Z" fill={`url(#${id})`} />
-      <path d="M52 44 L104 44 L82 70 L100 70 L44 112 L64 76 L46 76 Z" fill={`url(#${id})`} />
-    </svg>
+      alt="Flextron"
+      style={{ display: 'block', objectFit: 'contain' }}
+    />
+  );
+}
+
+export function BrandLogoFull({ height = 40, className }: { height?: number; className?: string }) {
+  return (
+    <img
+      src={FULL_SRC}
+      height={height}
+      width={Math.round((height * 1004) / 350)}
+      className={className}
+      alt="Flextron · Ft.energy"
+      style={{ display: 'block', objectFit: 'contain' }}
+    />
   );
 }
 
 interface LockupProps {
   /** Wordmark + tagline color. Use white on dark surfaces. */
   tone?: 'dark' | 'light';
-  /** Product line under the wordmark (defaults to the tagline). */
+  /** Product line under the wordmark. */
   tagline?: string;
   markSize?: number;
 }
