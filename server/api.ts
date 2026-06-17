@@ -11,7 +11,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, getVehicles, getVehicle, getHistory,
+  startSimulation, ingest, getVehicles, getVehicle, getHistory, deleteVehicle,
 } from './fleetStore';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
@@ -208,6 +208,18 @@ export async function handleApi(
         catch (e) { sendJson(res, 400, { error: (e as Error).message }); }
         return true;
       }
+    }
+  }
+
+  // ── Delete a vehicle (admin only) ──
+  if (method === 'DELETE') {
+    const dm = path.match(/^\/vehicles\/([^/]+)$/);
+    if (dm) {
+      if (user.role !== 'admin') { sendJson(res, 403, { error: 'admin only' }); return true; }
+      const id = decodeURIComponent(dm[1]);
+      const removed = deleteVehicle(id);
+      sendJson(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'not found' });
+      return true;
     }
   }
 

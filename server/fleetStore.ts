@@ -216,7 +216,8 @@ export function startSimulation() {
     const now = Date.now();
     for (const seed of SEEDS) {
       if (seed.forced === 'offline') continue;
-      const rec = store.get(seed.id)!;
+      const rec = store.get(seed.id);
+      if (!rec) continue; // seeded bike was deleted by an admin
       const isAlert = seed.forced === 'alert';
       const isCharge = seed.forced === 'charging';
 
@@ -389,6 +390,13 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
   }
   scheduleSave();
   return { ok: true, vehicleno: id };
+}
+
+/** Remove a vehicle and its history. It re-registers if the device posts again. */
+export function deleteVehicle(id: string): boolean {
+  const existed = store.delete(id);
+  if (existed) saveSnapshotNow();
+  return existed;
 }
 
 // ── Read API ─────────────────────────────────────────────

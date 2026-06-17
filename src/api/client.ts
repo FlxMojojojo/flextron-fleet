@@ -128,6 +128,9 @@ export function getVehicles(): Promise<VehicleState[]> {
 export function getVehicleLive(id: string): Promise<VehicleState> {
   return request<VehicleState>(`/api/vehicles/${encodeURIComponent(id)}`);
 }
+export function deleteVehicle(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
 export function getVehicleHistory(
   id: string, metric: HistoryMetric, range: '10m' | '1h' | '6h' = '1h',
 ): Promise<TimeSeriesPoint[]> {

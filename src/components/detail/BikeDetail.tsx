@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { getVehicleLive } from '../../api/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getVehicleLive, deleteVehicle } from '../../api/client';
+import { useAuth } from '../../auth/AuthContext';
 import type { VehicleState } from '../../types/telemetry';
 import { StatusChip } from '../shared/StatusChip';
 import { SocRing } from './SocRing';
@@ -27,6 +28,8 @@ function getAlerts(v: VehicleState): Alert[] {
 export function BikeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { user } = useAuth();
 
   const { data: v } = useQuery({
     queryKey: ['vehicle-live', id],
@@ -34,6 +37,18 @@ export function BikeDetail() {
     refetchInterval: 3000,
     enabled: !!id,
   });
+
+  async function onDelete() {
+    if (!id) return;
+    if (!confirm(`Delete device ${id}? It will be removed from the dashboard. If the device posts again, it re-registers automatically.`)) return;
+    try {
+      await deleteVehicle(id);
+      qc.invalidateQueries({ queryKey: ['vehicles'] });
+      navigate('/');
+    } catch (e) {
+      alert(`Could not delete: ${(e as Error).message}`);
+    }
+  }
 
   if (!v) {
     return (
@@ -65,6 +80,14 @@ export function BikeDetail() {
           </div>
         </div>
         <StatusChip status={v.status} />
+        {user?.role === 'admin' && (
+          <button className={s.deleteBtn} onClick={onDelete} aria-label={`Delete device ${v.vehicleno}`}>
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path d="M2.5 3.5h9M5.5 3.5V2.5h3v1M3.5 3.5l.5 8h6l.5-8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Delete device
+          </button>
+        )}
       </div>
 
       {/* Owner card */}
