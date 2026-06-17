@@ -48,6 +48,14 @@ export function AppShell() {
               Users
             </NavLink>
           )}
+          {isAdmin && (
+            <NavLink to="/admin/logs" className={({ isActive }) => `${s.navLink}${isActive ? ' ' + s.active : ''}`}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M2 3h10M2 7h10M2 11h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+              Logs
+            </NavLink>
+          )}
         </nav>
 
         <div className={s.liveIndicator} aria-live="polite" aria-label="Live data connected">

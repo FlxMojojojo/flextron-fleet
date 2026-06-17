@@ -103,6 +103,24 @@ export function deleteOwner(id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/owners/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
+// ── Admin: raw API logs ──
+export interface ApiLogEntry {
+  id: number;
+  ts: number;
+  ip: string;
+  method: string;
+  path: string;
+  type: string | null;
+  vehicleno: string | null;
+  status: number;
+  ok: boolean;
+  error?: string;
+  body: unknown;
+}
+export function getApiLogs(limit = 200): Promise<ApiLogEntry[]> {
+  return request<ApiLogEntry[]>(`/api/logs?limit=${limit}`);
+}
+
 // ── Telemetry ──
 export function getVehicles(): Promise<VehicleState[]> {
   return request<VehicleState[]>('/api/vehicles');

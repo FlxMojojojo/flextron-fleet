@@ -20,7 +20,14 @@ import {
 import {
   initOwners, listOwners, createOwner, updateOwner, deleteOwner, getOwnerByVehicle,
 } from './owners';
+import { logApi, listApiLogs } from './apiLog';
 import type { HistoryMetric, VehicleState } from '../src/types/telemetry';
+
+function clientIp(req: IncomingMessage): string {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd.length) return fwd.split(',')[0].trim();
+  return req.socket?.remoteAddress ?? 'unknown';
+}
 
 /** Attach the mapped owner (if any) to a vehicle state. */
 function withOwner(v: VehicleState): VehicleState {
@@ -110,19 +117,30 @@ export async function handleApi(
 
   // ── Machine ingest (token or user) ──
   if (method === 'POST' && path === '/ingest') {
+    const ip = clientIp(req);
     const key = req.headers['x-api-key'];
     const okToken = INGEST_TOKEN && (bearer(req) === INGEST_TOKEN || key === INGEST_TOKEN);
     const okUser = !!currentUser(req);
     const okOpen = !INGEST_TOKEN; // open if no token configured (dev)
-    if (!okToken && !okUser && !okOpen) return sendJson(res, 401, { error: 'unauthorized' }), true;
-    try {
-      const payload = await readBody(req) as { vehicleno?: string; type?: string };
-      if (!payload?.vehicleno || !payload?.type) return sendJson(res, 400, { error: 'vehicleno and type are required' }), true;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      sendJson(res, 200, ingest(payload as any));
-    } catch {
-      sendJson(res, 400, { error: 'invalid JSON' });
+    if (!okToken && !okUser && !okOpen) {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: null, vehicleno: null, status: 401, ok: false, error: 'unauthorized', body: null });
+      return sendJson(res, 401, { error: 'unauthorized' }), true;
     }
+    let payload: { vehicleno?: string; type?: string } = {};
+    try {
+      payload = await readBody(req) as { vehicleno?: string; type?: string };
+    } catch {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: null, vehicleno: null, status: 400, ok: false, error: 'invalid JSON', body: null });
+      return sendJson(res, 400, { error: 'invalid JSON' }), true;
+    }
+    if (!payload?.vehicleno || !payload?.type) {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: payload?.type ?? null, vehicleno: payload?.vehicleno ?? null, status: 400, ok: false, error: 'vehicleno and type are required', body: payload });
+      return sendJson(res, 400, { error: 'vehicleno and type are required' }), true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = ingest(payload as any);
+    logApi({ ts: Date.now(), ip, method, path: pathname, type: payload.type ?? null, vehicleno: payload.vehicleno ?? null, status: 200, ok: true, body: payload });
+    sendJson(res, 200, result);
     return true;
   }
 
@@ -131,6 +149,14 @@ export async function handleApi(
   if (!user) { sendJson(res, 401, { error: 'authentication required' }); return true; }
 
   if (method === 'GET' && path === '/auth/me') { sendJson(res, 200, { user: toPublic(user) }); return true; }
+
+  // ── Admin: raw API logs ──
+  if (method === 'GET' && path === '/logs') {
+    if (user.role !== 'admin') { sendJson(res, 403, { error: 'admin only' }); return true; }
+    const limit = Math.min(Number(search.get('limit')) || 200, 300);
+    sendJson(res, 200, listApiLogs(limit));
+    return true;
+  }
 
   // ── Admin: user management ──
   if (path === '/users' || path.startsWith('/users/')) {
