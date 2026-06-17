@@ -1,0 +1,204 @@
+.root {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Summary strip ── */
+.strip {
+  position: absolute;
+  top: var(--sp-4);
+  left: calc(var(--sidebar-w) + var(--sp-4));
+  right: var(--sp-4);
+  z-index: 5;
+  display: flex;
+  gap: var(--sp-3);
+  pointer-events: none;
+}
+
+.stat {
+  background: var(--c-white);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-5);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 90px;
+}
+
+.statValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--c-ink);
+  line-height: 1;
+}
+
+.statLabel {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.statValue.alert { color: var(--c-warn); }
+.statValue.good  { color: var(--c-good); }
+.statValue.blue  { color: var(--c-blue); }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--c-white);
+  border-right: 1px solid var(--c-hairline);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.sidebarHead {
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--c-hairline);
+  flex-shrink: 0;
+}
+
+.searchWrap {
+  position: relative;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 10px 8px 34px;
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--c-ink);
+  background: var(--c-surf-2);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.searchInput:focus {
+  border-color: var(--c-blue);
+  box-shadow: 0 0 0 3px rgba(30,91,255,0.12);
+}
+
+.bikeList {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-2) 0;
+}
+
+/* ── Bike row ── */
+.bikeRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-surf-1);
+  cursor: pointer;
+  transition: background var(--transition);
+  border-left: 3px solid transparent;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border-top: none;
+  border-right: none;
+}
+
+.bikeRow:hover,
+.bikeRow:focus-visible {
+  background: var(--c-surf-1);
+  outline: none;
+}
+
+.bikeRow.selected {
+  background: var(--c-surf-1);
+  border-left-color: var(--c-blue);
+}
+
+.bikeRow:focus-visible {
+  outline: 2px solid var(--c-blue);
+  outline-offset: -2px;
+}
+
+.bikeRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.bikeNo {
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+
+.lastSeen {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #94A3B8;
+}
+
+/* ── Map ── */
+.mapWrap {
+  flex: 1;
+  position: relative;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+/* Marker styles injected via JS */
+:global(.bike-marker) {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+
+:global(.bike-marker:hover) { transform: scale(1.15); }
+:global(.bike-marker.ok)       { background: #0E9F6E; }
+:global(.bike-marker.charging) { background: #1E5BFF; }
+:global(.bike-marker.alert)    { background: #C2410C; animation: ring-pulse 1.5s infinite; }
+:global(.bike-marker.offline)  { background: #94A3B8; }
+
+:global(.maplibregl-popup-content) {
+  font-family: var(--font-body);
+  font-size: 13px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+}
+
+@media (max-width: 768px) {
+  .root { flex-direction: column; }
+  .sidebar { width: 100%; height: 260px; border-right: none; border-bottom: 1px solid var(--c-hairline); }
+  .strip { left: var(--sp-2); right: var(--sp-2); top: var(--sp-2); flex-wrap: wrap; }
+}

@@ -1,0 +1,363 @@
+.root {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--c-surf-2);
+  padding: var(--sp-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-5);
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--c-white);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-md);
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--c-ink);
+  cursor: pointer;
+  transition: background var(--transition);
+  text-decoration: none;
+}
+
+.backBtn:hover, .backBtn:focus-visible {
+  background: var(--c-surf-1);
+  outline: 2px solid var(--c-blue);
+  outline-offset: 1px;
+}
+
+.headerInfo { flex: 1; }
+
+.bikeNo {
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--c-ink);
+  line-height: 1;
+  margin-bottom: var(--sp-1);
+}
+
+.lastUpdate {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+}
+
+/* ── Instrument cluster ── */
+.cluster {
+  background: var(--c-navy);
+  border-radius: var(--r-xl);
+  padding: var(--sp-6);
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: var(--sp-6);
+  align-items: center;
+}
+
+.socRingWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.socRingSvg { display: block; }
+
+.socValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  color: var(--c-white);
+  text-align: center;
+  line-height: 1;
+}
+
+.socLabel {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.5);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+.gaugeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+}
+
+.gauge {
+  background: rgba(255,255,255,0.06);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.gaugeValue {
+  font-family: var(--font-mono);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--c-white);
+  line-height: 1;
+}
+
+.gaugeValue.cyan  { color: var(--c-cyan); }
+.gaugeValue.warn  { color: #FF7A5C; }
+.gaugeValue.good  { color: #4ADE80; }
+
+.gaugeUnit {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.4);
+}
+
+.gaugeLabel {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.5);
+  margin-top: var(--sp-1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mosPills {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.mosPill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: var(--r-full);
+  letter-spacing: 0.03em;
+}
+
+.mosOn  { background: rgba(74,222,128,0.18); color: #4ADE80; }
+.mosOff { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.35); }
+
+/* ── Section card ── */
+.card {
+  background: var(--c-white);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+}
+
+.cardTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--c-ink);
+  margin-bottom: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.outlierBadge {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  background: var(--c-status-alert-bg);
+  color: var(--c-warn);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-weight: 500;
+}
+
+/* ── Temperature sensors ── */
+.tempGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-3);
+}
+
+.tempCell {
+  background: var(--c-surf-2);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.tempVal {
+  font-family: var(--font-mono);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--c-ink);
+  line-height: 1;
+}
+
+.tempVal.tempWarn { color: var(--c-warn); }
+
+.tempUnit {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #94A3B8;
+  margin-left: 2px;
+}
+
+.tempLabel {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Charts row ── */
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-5);
+}
+
+/* ── Location card ── */
+.locationGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--sp-4);
+  align-items: start;
+}
+
+.locationData {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.locationRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.locationKey {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.locationVal {
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  color: var(--c-ink);
+  font-weight: 500;
+}
+
+.miniMap {
+  width: 180px;
+  height: 120px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--c-hairline);
+  flex-shrink: 0;
+}
+
+/* ── Alerts list ── */
+.alertItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--c-surf-1);
+}
+
+.alertItem:last-child { border-bottom: none; }
+
+.alertIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--c-status-alert-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alertText {
+  flex: 1;
+}
+
+.alertTitle {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-warn);
+}
+
+.alertDesc {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+  margin-top: 2px;
+}
+
+.noAlerts {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--c-good);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* ── Tab bar for history metric ── */
+.tabBar {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.tab {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--c-hairline);
+  background: transparent;
+  color: #6B7F9A;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.tab:hover { background: var(--c-surf-1); color: var(--c-ink); }
+.tab.active { background: var(--c-blue); border-color: var(--c-blue); color: white; }
+
+@media (max-width: 900px) {
+  .cluster { grid-template-columns: 1fr; }
+  .gaugeGrid { grid-template-columns: repeat(2, 1fr); }
+  .chartsGrid { grid-template-columns: 1fr; }
+  .locationGrid { grid-template-columns: 1fr; }
+  .miniMap { width: 100%; height: 160px; }
+}
+
+@media (max-width: 600px) {
+  .root { padding: var(--sp-3); }
+  .gaugeGrid { grid-template-columns: repeat(2, 1fr); }
+  .tempGrid { grid-template-columns: repeat(2, 1fr); }
+}

@@ -1,0 +1,31 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.ok       { color: var(--c-status-ok);       background: var(--c-status-ok-bg); }
+.ok .dot  { background: var(--c-status-ok); }
+
+.charging      { color: var(--c-status-charging);       background: var(--c-status-charging-bg); }
+.charging .dot { background: var(--c-status-charging); animation: dot-pulse 1.4s ease-in-out infinite; }
+
+.alert      { color: var(--c-status-alert);       background: var(--c-status-alert-bg); }
+.alert .dot { background: var(--c-status-alert); animation: dot-pulse 0.8s ease-in-out infinite; }
+
+.offline      { color: var(--c-status-offline);       background: var(--c-status-offline-bg); }
+.offline .dot { background: var(--c-status-offline); }

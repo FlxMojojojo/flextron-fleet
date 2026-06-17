@@ -1,0 +1,117 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--c-surf-2);
+}
+
+.topbar {
+  height: var(--nav-h);
+  background: var(--c-navy);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-6);
+  gap: var(--sp-8);
+  flex-shrink: 0;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.06);
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 28px;
+  height: 28px;
+  background: var(--c-blue);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.brandMark svg { display: block; }
+
+.brandName {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--c-white);
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.brandSub {
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: 1;
+}
+
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 6px var(--sp-3);
+  border-radius: var(--r-md);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.navLink:hover,
+.navLink:focus-visible {
+  background: rgba(255,255,255,0.08);
+  color: var(--c-white);
+  outline: 2px solid var(--c-cyan);
+  outline-offset: 1px;
+}
+
+.navLink.active {
+  background: rgba(255,255,255,0.1);
+  color: var(--c-white);
+}
+
+.liveIndicator {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  color: var(--c-cyan);
+  font-weight: 500;
+}
+
+.liveDot {
+  width: 7px;
+  height: 7px;
+  background: var(--c-cyan);
+  border-radius: 50%;
+  animation: ring-pulse 2s ease-in-out infinite;
+}
+
+.body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
