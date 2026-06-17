@@ -118,7 +118,15 @@ The browser already talks to `/api/...`, so going live is a base-URL swap:
 - **Range traveled (GPS)** — haversine sum of consecutive GPS fixes, GPS-only
   (independent of the odometer field).
 
-## Map tiles
+## Maps
+
+- **Google Maps** is used when `VITE_GOOGLE_MAPS_API_KEY` is set; otherwise the
+  app falls back to keyless OpenStreetMap (MapLibre) so it always runs.
+- For the **branded telemetry-blue basemap**, follow
+  [`docs/MAP_STYLE_SETUP.md`](docs/MAP_STYLE_SETUP.md) to create a styled Map ID
+  from `docs/flextron-map-style.json`, then set `VITE_GOOGLE_MAPS_MAP_ID`.
+
+## Map tiles (fallback)
 
 Currently uses OpenStreetMap raster tiles (keyless).
 **Production:** switch to MapTiler vector tiles or Protomaps (self-hostable).
