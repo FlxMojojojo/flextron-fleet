@@ -70,9 +70,17 @@ function readBody(req: IncomingMessage): Promise<unknown> {
   });
 }
 
+/** Strip anything after the first whitespace/backslash so a malformed
+ *  modem header like `Bearer <tok>\r\nx-api-key: <tok>` (where the \r\n is sent
+ *  as literal characters) still yields the bare token. Real tokens have no
+ *  spaces or backslashes, so this is safe. */
+function cleanToken(raw: string): string {
+  return raw.split(/[\s\\]/)[0].trim();
+}
+
 function bearer(req: IncomingMessage): string | null {
   const auth = req.headers['authorization'];
-  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return auth.slice(7);
+  if (typeof auth === 'string' && auth.startsWith('Bearer ')) return cleanToken(auth.slice(7));
   return null;
 }
 
@@ -120,7 +128,7 @@ export async function handleApi(
   // ── Machine ingest (token or user) ──
   if (method === 'POST' && path === '/ingest') {
     const ip = clientIp(req);
-    const key = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] as string : undefined;
+    const key = typeof req.headers['x-api-key'] === 'string' ? cleanToken(req.headers['x-api-key'] as string) : undefined;
     const bearerTok = bearer(req);
     const okToken = INGEST_TOKENS.some(t => t === bearerTok || t === key);
     const okUser = !!currentUser(req);
