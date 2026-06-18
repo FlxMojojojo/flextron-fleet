@@ -34,7 +34,9 @@ function withOwner(v: VehicleState): VehicleState {
   return { ...v, owner: getOwnerByVehicle(v.vehicleno) };
 }
 
-const INGEST_TOKEN = process.env.INGEST_TOKEN ?? '';
+// INGEST_TOKEN may be a single token or a comma-separated list (any one valid).
+const INGEST_TOKENS = (process.env.INGEST_TOKEN ?? '')
+  .split(',').map(t => t.trim()).filter(Boolean);
 const CORS_ORIGIN = process.env.CORS_ORIGIN ?? '*';
 
 let booted = false;
@@ -118,10 +120,11 @@ export async function handleApi(
   // ── Machine ingest (token or user) ──
   if (method === 'POST' && path === '/ingest') {
     const ip = clientIp(req);
-    const key = req.headers['x-api-key'];
-    const okToken = INGEST_TOKEN && (bearer(req) === INGEST_TOKEN || key === INGEST_TOKEN);
+    const key = typeof req.headers['x-api-key'] === 'string' ? req.headers['x-api-key'] as string : undefined;
+    const bearerTok = bearer(req);
+    const okToken = INGEST_TOKENS.some(t => t === bearerTok || t === key);
     const okUser = !!currentUser(req);
-    const okOpen = !INGEST_TOKEN; // open if no token configured (dev)
+    const okOpen = INGEST_TOKENS.length === 0; // open if no token configured (dev)
     if (!okToken && !okUser && !okOpen) {
       logApi({ ts: Date.now(), ip, method, path: pathname, type: null, vehicleno: null, status: 401, ok: false, error: 'unauthorized', body: null });
       return sendJson(res, 401, { error: 'unauthorized' }), true;
