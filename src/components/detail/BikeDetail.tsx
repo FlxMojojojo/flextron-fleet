@@ -191,6 +191,10 @@ export function BikeDetail() {
             <span className={s.gaugeLabel}>Range Traveled (GPS)</span>
           </div>
           <div className={s.gauge}>
+            <span className={s.gaugeValue}>{can.cycle_count}<span className={s.gaugeUnit}> cyc</span></span>
+            <span className={s.gaugeLabel}>Cycle Count</span>
+          </div>
+          <div className={s.gauge}>
             <span className={s.gaugeLabel} style={{ marginTop: 0 }}>MOS Gates</span>
             <div className={s.mosPills}>
               <span className={`${s.mosPill} ${can.chg_mos ? s.mosOn : s.mosOff}`}>CHG</span>
