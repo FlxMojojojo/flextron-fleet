@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getVehicleLive, deleteVehicle } from '../../api/client';
+import { getVehicleLive, deleteVehicle, resetTrip } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import type { VehicleState } from '../../types/telemetry';
 import { StatusChip } from '../shared/StatusChip';
@@ -47,6 +47,17 @@ export function BikeDetail() {
       navigate('/');
     } catch (e) {
       alert(`Could not delete: ${(e as Error).message}`);
+    }
+  }
+
+  async function onResetTrip() {
+    if (!id) return;
+    if (!confirm(`Reset trip distance for ${id} to 0 km?`)) return;
+    try {
+      await resetTrip(id);
+      qc.invalidateQueries({ queryKey: ['vehicle-live', id] });
+    } catch (e) {
+      alert(`Could not reset: ${(e as Error).message}`);
     }
   }
 
@@ -225,31 +236,41 @@ export function BikeDetail() {
       {/* Location */}
       <section className={s.card}>
         <h2 className={s.cardTitle}>Location</h2>
-        <div className={s.locationGrid}>
-          <div className={s.locationData}>
-            <div className={s.locationRow}>
-              <span className={s.locationKey}>Latitude</span>
-              <span className={s.locationVal}>{gps.latitude.toFixed(6)}°</span>
-            </div>
-            <div className={s.locationRow}>
-              <span className={s.locationKey}>Longitude</span>
-              <span className={s.locationVal}>{gps.longitude.toFixed(6)}°</span>
-            </div>
-            <div className={s.locationRow}>
-              <span className={s.locationKey}>Odometer</span>
-              <span className={s.locationVal}>{can.odometer.toFixed(1)} km</span>
-            </div>
-            <div className={s.locationRow}>
-              <span className={s.locationKey}>Distance Traveled (GPS)</span>
-              <span className={s.locationVal}>{v.gps_distance_km.toFixed(2)} km</span>
-            </div>
-            <div className={s.locationRow}>
-              <span className={s.locationKey}>Cycle Count</span>
-              <span className={s.locationVal}>{can.cycle_count}</span>
-            </div>
-          </div>
-          <MiniMap gps={gps} className={s.miniMap} />
+
+        {/* Address (reverse-geocoded) */}
+        <div className={s.addressRow}>
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none" aria-hidden="true">
+            <path d="M7.5 1.5c-2.8 0-5 2.1-5 4.9 0 3.4 5 7.6 5 7.6s5-4.2 5-7.6c0-2.8-2.2-4.9-5-4.9Z" stroke="#1E5BFF" strokeWidth="1.3"/>
+            <circle cx="7.5" cy="6.3" r="1.7" stroke="#1E5BFF" strokeWidth="1.3"/>
+          </svg>
+          <span className={s.addressText}>{v.address ?? 'Resolving address…'}</span>
         </div>
+
+        <div className={s.locationFields}>
+          <div className={s.locationRow}>
+            <span className={s.locationKey}>Latitude</span>
+            <span className={s.locationVal}>{gps.latitude.toFixed(6)}°</span>
+          </div>
+          <div className={s.locationRow}>
+            <span className={s.locationKey}>Longitude</span>
+            <span className={s.locationVal}>{gps.longitude.toFixed(6)}°</span>
+          </div>
+          <div className={s.locationRow}>
+            <span className={s.locationKey}>Distance Traveled (GPS)</span>
+            <span className={s.locationVal}>
+              {v.gps_distance_km.toFixed(2)} km
+              {user?.role === 'admin' && (
+                <button className={s.resetTrip} onClick={onResetTrip} title="Reset trip distance to 0">reset</button>
+              )}
+            </span>
+          </div>
+          <div className={s.locationRow}>
+            <span className={s.locationKey}>Cycle Count</span>
+            <span className={s.locationVal}>{can.cycle_count}</span>
+          </div>
+        </div>
+
+        <MiniMap gps={gps} className={s.bigMap} interactive />
       </section>
 
       {/* Battery faults (decoded from the BMS fault frame) + derived alerts */}

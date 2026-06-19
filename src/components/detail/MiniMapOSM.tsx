@@ -16,7 +16,7 @@ const OSM_STYLE: maplibregl.StyleSpecification = {
   layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
 };
 
-export function MiniMapOSM({ gps, className }: { gps: GpsTelemetry; className?: string }) {
+export function MiniMapOSM({ gps, className, interactive }: { gps: GpsTelemetry; className?: string; interactive?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
@@ -27,13 +27,14 @@ export function MiniMapOSM({ gps, className }: { gps: GpsTelemetry; className?: 
       container: ref.current,
       style: OSM_STYLE,
       center: [gps.longitude, gps.latitude],
-      zoom: 15,
-      interactive: false,
+      zoom: interactive ? 16 : 15,
+      interactive: !!interactive,
     });
+    if (interactive) map.addControl(new maplibregl.NavigationControl(), 'top-right');
     const el = document.createElement('div');
     el.className = 'bike-marker ok';
-    el.style.width = '18px';
-    el.style.height = '18px';
+    el.style.width = '22px';
+    el.style.height = '22px';
     markerRef.current = new maplibregl.Marker({ element: el })
       .setLngLat([gps.longitude, gps.latitude])
       .addTo(map);

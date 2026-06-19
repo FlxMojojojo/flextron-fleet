@@ -11,7 +11,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, getVehicles, getVehicle, getHistory, deleteVehicle,
+  startSimulation, ingest, getVehicles, getVehicle, getHistory, deleteVehicle, resetTrip,
 } from './fleetStore';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
@@ -230,6 +230,18 @@ export async function handleApi(
       const id = decodeURIComponent(dm[1]);
       const removed = deleteVehicle(id);
       sendJson(res, removed ? 200 : 404, removed ? { ok: true } : { error: 'not found' });
+      return true;
+    }
+  }
+
+  // ── Reset a vehicle's trip distance (admin only) ──
+  if (method === 'POST') {
+    const rm = path.match(/^\/vehicles\/([^/]+)\/reset-trip$/);
+    if (rm) {
+      if (user.role !== 'admin') { sendJson(res, 403, { error: 'admin only' }); return true; }
+      const id = decodeURIComponent(rm[1]);
+      const ok = resetTrip(id);
+      sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'not found' });
       return true;
     }
   }

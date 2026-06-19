@@ -442,6 +442,62 @@
   flex-shrink: 0;
 }
 
+/* Reverse-geocoded address line */
+.addressRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--c-surf-2);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-md);
+  margin-bottom: var(--sp-4);
+}
+.addressRow svg { flex-shrink: 0; margin-top: 2px; }
+.addressText {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  color: var(--c-ink);
+  line-height: 1.4;
+}
+
+/* Location data as a responsive row of fields */
+.locationFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+
+/* Big interactive map */
+.bigMap {
+  width: 100%;
+  height: 380px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--c-hairline);
+}
+
+.resetTrip {
+  margin-left: var(--sp-2);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--c-blue);
+  background: var(--c-status-charging-bg);
+  border: 1px solid #C7D9FF;
+  border-radius: var(--r-sm);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.resetTrip:hover { background: #DCE8FF; }
+
+@media (max-width: 600px) {
+  .bigMap { height: 300px; }
+}
+
 /* ── Alerts list ── */
 .alertItem {
   display: flex;

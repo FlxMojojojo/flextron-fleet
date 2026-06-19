@@ -131,6 +131,9 @@ export function getVehicleLive(id: string): Promise<VehicleState> {
 export function deleteVehicle(id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+export function resetTrip(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/vehicles/${encodeURIComponent(id)}/reset-trip`, { method: 'POST' });
+}
 export function getVehicleHistory(
   id: string, metric: HistoryMetric, range: '10m' | '1h' | '6h' = '1h',
 ): Promise<TimeSeriesPoint[]> {

@@ -14,6 +14,7 @@ import type {
   CanTelemetry, GpsTelemetry, VehicleState, VehicleStatus, HistoryMetric,
 } from '../src/types/telemetry';
 import { decodeFaults } from './faults';
+import { reverseGeocode } from './geocode';
 
 // ── Persistence ──────────────────────────────────────────
 // State survives restarts/reboots by snapshotting to disk. Override the
@@ -459,7 +460,23 @@ export function getVehicles(): VehicleState[] {
 }
 export function getVehicle(id: string): VehicleState | null {
   const rec = store.get(id);
-  return rec ? toVehicleState(id, rec) : null;
+  if (!rec) return null;
+  const vs = toVehicleState(id, rec);
+  // Reverse-geocode only for single-vehicle reads (the detail page).
+  vs.address = reverseGeocode(rec.gps.latitude, rec.gps.longitude);
+  return vs;
+}
+
+/** Reset a vehicle's GPS-derived trip distance/speed without deleting it. */
+export function resetTrip(id: string): boolean {
+  const rec = store.get(id);
+  if (!rec) return false;
+  rec.gpsDistanceKm = 0;
+  rec.gpsSpeedKmh = 0;
+  rec.prevGps = null;
+  rec.lastGpsTs = 0;
+  saveSnapshotNow();
+  return true;
 }
 export function getHistory(id: string, metric: HistoryMetric) {
   const rec = store.get(id);
