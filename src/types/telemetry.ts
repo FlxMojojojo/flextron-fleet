@@ -34,6 +34,18 @@ export interface GpsTelemetry {
 
 export type VehicleStatus = 'ok' | 'charging' | 'alert' | 'offline';
 
+export type FaultSeverity = 'WARNING' | 'CRITICAL';
+
+/** A decoded BMS fault from the Daly 0x040980 fault frame. */
+export interface Fault {
+  code: string;
+  severity: FaultSeverity;
+  description: string;
+  byte: number;
+  bit: number;
+  escalate: boolean;
+}
+
 export type VehicleType = '2W' | '3W';
 
 /** A bike owner / customer, manually mapped to one FLX IoT device. */
@@ -57,6 +69,8 @@ export interface VehicleState {
   hours_since_charge: number | null; // hours since charging_status was last 1
   gps_distance_km: number;           // distance traveled, derived from GPS points only
   owner?: Owner | null;              // mapped owner, attached by the API layer
+  faults: Fault[];                   // decoded active BMS faults (from fault_bytes)
+  fault_bytes?: number[];            // raw 8-byte fault frame as received
 }
 
 export interface TimeSeriesPoint {

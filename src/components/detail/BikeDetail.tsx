@@ -61,6 +61,9 @@ export function BikeDetail() {
   const { can, gps } = v;
   const avgTemp = (can.battery_temp_1 + can.battery_temp_2 + can.battery_temp_3 + can.battery_temp_4) / 4;
   const alerts = getAlerts(v);
+  const faults = v.faults ?? [];
+  const criticalFaults = faults.filter(f => f.severity === 'CRITICAL');
+  const warningFaults = faults.filter(f => f.severity === 'WARNING');
 
   return (
     <div className={s.root}>
@@ -89,6 +92,21 @@ export function BikeDetail() {
           </button>
         )}
       </div>
+
+      {/* Critical fault banner — top of page for immediate visibility */}
+      {criticalFaults.length > 0 && (
+        <div className={s.critBanner} role="alert">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+            <path d="M10 2L19 17H1L10 2Z" stroke="currentColor" strokeWidth="1.6" fill="none"/>
+            <path d="M10 7.5V11.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            <circle cx="10" cy="14.5" r="0.9" fill="currentColor"/>
+          </svg>
+          <div className={s.critBannerText}>
+            <strong>CRITICAL · {criticalFaults.length} active fault{criticalFaults.length > 1 ? 's' : ''}</strong>
+            <span>{criticalFaults.map(f => f.description).join(' · ')}</span>
+          </div>
+        </div>
+      )}
 
       {/* Owner card */}
       <section className={s.card}>
@@ -201,7 +219,7 @@ export function BikeDetail() {
       {/* Time-series */}
       <section className={s.card}>
         <h2 className={s.cardTitle}>History</h2>
-        <TelemetryChart vehicleId={v.vehicleno} />
+        <TelemetryChart vehicleId={v.vehicleno} cellCount={can.cell_voltages.length} />
       </section>
 
       {/* Location */}
@@ -234,30 +252,45 @@ export function BikeDetail() {
         </div>
       </section>
 
-      {/* Alerts */}
+      {/* Battery faults (decoded from the BMS fault frame) + derived alerts */}
       <section className={s.card}>
-        <h2 className={s.cardTitle}>Active Alerts</h2>
-        {alerts.length === 0 ? (
+        <h2 className={s.cardTitle}>
+          Battery Faults &amp; Alerts
+          {faults.length > 0 && (
+            <span className={s.faultCount}>
+              {criticalFaults.length > 0 && <span className={s.faultCountCrit}>{criticalFaults.length} critical</span>}
+              {warningFaults.length > 0 && <span className={s.faultCountWarn}>{warningFaults.length} warning</span>}
+            </span>
+          )}
+        </h2>
+
+        {faults.length === 0 && alerts.length === 0 ? (
           <div className={s.noAlerts}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <circle cx="7" cy="7" r="6" stroke="#0E9F6E" strokeWidth="1.4"/>
               <path d="M4.5 7L6.5 9L9.5 5" stroke="#0E9F6E" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            No active alerts
+            No active faults — battery nominal
           </div>
         ) : (
-          <ul aria-label="Active alerts">
-            {alerts.map(a => (
-              <li key={a.id} className={s.alertItem}>
-                <div className={s.alertIcon} aria-hidden="true">
-                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                    <path d="M6 1L11.5 10.5H0.5L6 1Z" stroke="#C2410C" strokeWidth="1.2" fill="none"/>
-                    <path d="M6 4.5V7" stroke="#C2410C" strokeWidth="1.2" strokeLinecap="round"/>
-                    <circle cx="6" cy="8.5" r="0.6" fill="#C2410C"/>
-                  </svg>
-                </div>
+          <ul aria-label="Active battery faults">
+            {faults.map(f => (
+              <li key={f.code} className={`${s.faultItem} ${f.severity === 'CRITICAL' ? s.faultCrit : s.faultWarn}`}>
+                <span className={`${s.sevChip} ${f.severity === 'CRITICAL' ? s.sevCrit : s.sevWarn}`}>
+                  {f.severity}{f.escalate ? ' · ESCALATE' : ''}
+                </span>
                 <div className={s.alertText}>
-                  <div className={s.alertTitle}>{a.title}</div>
+                  <div className={s.faultDesc}>{f.description}</div>
+                  <code className={s.faultCode}>{f.code}</code>
+                </div>
+              </li>
+            ))}
+            {/* Derived advisories (heuristics, not from fault_bytes) */}
+            {alerts.map(a => (
+              <li key={a.id} className={`${s.faultItem} ${s.faultWarn}`}>
+                <span className={`${s.sevChip} ${s.sevInfo}`}>DERIVED</span>
+                <div className={s.alertText}>
+                  <div className={s.faultDesc}>{a.title}</div>
                   <div className={s.alertDesc}>{a.desc}</div>
                 </div>
               </li>

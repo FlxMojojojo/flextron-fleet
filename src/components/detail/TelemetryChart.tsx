@@ -16,7 +16,7 @@ function fmt(ts: number) {
   return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-export function TelemetryChart({ vehicleId }: { vehicleId: string }) {
+export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: string; cellCount?: number }) {
   const [active, setActive] = useState<HistoryMetric>('soc');
   const meta = METRICS.find(m => m.key === active)!;
 
@@ -27,6 +27,15 @@ export function TelemetryChart({ vehicleId }: { vehicleId: string }) {
   });
 
   const points = data.slice(-40);
+
+  // Pack voltage axis is bounded to the real operating range per pack type:
+  //   20S → 40–74 V, 24S → 48–88 V. Other metrics auto-scale.
+  const is24S = cellCount >= 24;
+  const yDomain: [number | 'auto', number | 'auto'] =
+    active === 'sum_voltage' ? (is24S ? [48, 88] : [40, 74]) : ['auto', 'auto'];
+  const yTicks = active === 'sum_voltage'
+    ? (is24S ? [48, 58, 68, 78, 88] : [40, 48, 56, 64, 74])
+    : undefined;
 
   return (
     <div>
@@ -54,6 +63,9 @@ export function TelemetryChart({ vehicleId }: { vehicleId: string }) {
             interval="preserveStartEnd"
           />
           <YAxis
+            domain={yDomain}
+            ticks={yTicks}
+            allowDataOverflow
             tick={{ fontFamily: 'JetBrains Mono', fontSize: 9, fill: '#6B7F9A' }}
             tickFormatter={v => `${v}${meta.unit}`}
             width={48}

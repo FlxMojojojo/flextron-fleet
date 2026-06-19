@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 import type {
   CanTelemetry, GpsTelemetry, VehicleState, VehicleStatus, HistoryMetric,
 } from '../src/types/telemetry';
+import { decodeFaults } from './faults';
 
 // ── Persistence ──────────────────────────────────────────
 // State survives restarts/reboots by snapshotting to disk. Override the
@@ -56,6 +57,7 @@ interface InternalRecord {
   lastChargeTs: number | null; // last time charging_status === 1
   gpsDistanceKm: number;       // accumulated from GPS deltas only
   prevGps: { lat: number; lng: number } | null;
+  faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
   history: { ts: number; soc: number; sum_voltage: number; battery_temp_1: number; discharge_current: number }[];
 }
 
@@ -64,9 +66,9 @@ const store = new Map<string, InternalRecord>();
 // A vehicle is considered offline if no telemetry arrives within this window.
 const OFFLINE_AFTER_MS = (Number(process.env.OFFLINE_AFTER_SEC) || 60) * 1000;
 
-function deriveStatus(can: CanTelemetry, forced?: VehicleStatus): VehicleStatus {
+function deriveStatus(can: CanTelemetry, forced: VehicleStatus | undefined, hasCriticalFault: boolean): VehicleStatus {
   if (forced === 'offline') return 'offline';
-  if (can.hv_critical_alert || can.battery_high_temp_telltale || (can.max_v - can.min_v) > 0.3) return 'alert';
+  if (hasCriticalFault || can.hv_critical_alert || can.battery_high_temp_telltale || (can.max_v - can.min_v) > 0.3) return 'alert';
   if (can.charging_status === 1) return 'charging';
   return 'ok';
 }
@@ -75,15 +77,19 @@ function toVehicleState(id: string, rec: InternalRecord): VehicleState {
   const cellDelta = parseFloat((rec.can.max_v - rec.can.min_v).toFixed(3));
   const now = Date.now();
   const stale = now - rec.can.ts > OFFLINE_AFTER_MS;
+  const faults = decodeFaults(rec.faultBytes);
+  const hasCritical = faults.some(f => f.severity === 'CRITICAL');
   return {
     vehicleno: id,
     can: rec.can,
     gps: rec.gps,
-    status: stale ? 'offline' : deriveStatus(rec.can, rec.forcedStatus),
+    status: stale ? 'offline' : deriveStatus(rec.can, rec.forcedStatus, hasCritical),
     cell_delta: cellDelta,
     last_seen: rec.can.ts,
     hours_since_charge: rec.lastChargeTs == null ? null : parseFloat(((now - rec.lastChargeTs) / 3_600_000).toFixed(2)),
     gps_distance_km: parseFloat(rec.gpsDistanceKm.toFixed(3)),
+    faults,
+    fault_bytes: rec.faultBytes,
   };
 }
 
@@ -164,12 +170,19 @@ function init() {
         discharge_current: parseFloat((can.discharge_current + decay * rnd(-2, 2, 2)).toFixed(2)),
       };
     });
+    // Demo fault frames on the seeded alert bikes so the faults panel is
+    // populated out of the box (real devices send their own fault_bytes).
+    let faultBytes: number[] | undefined;
+    if (seed.id === 'FLX-007') faultBytes = [0, 0x20, 0, 0, 0, 0, 0x40, 0]; // DSG_TEMP_HIGH_L2 (crit) + THERMAL_RUNAWAY (crit)
+    if (seed.id === 'FLX-014') faultBytes = [0x01, 0, 0, 0x01, 0, 0, 0, 0];  // CELL_OVERVOLT_L1 (warn) + VOLT_DIFF_L1 (warn)
+
     store.set(seed.id, {
       can, gps,
       forcedStatus: seed.forced,
       lastChargeTs: seed.forced === 'charging' ? now : now - rnd(0.5, 9, 2) * 3_600_000,
       gpsDistanceKm: parseFloat(rnd(0, 12, 2).toFixed(2)),
       prevGps: { lat: gps.latitude, lng: gps.longitude },
+      faultBytes,
       history,
     });
   }
@@ -273,7 +286,7 @@ function pushHistory(rec: InternalRecord, ts: number) {
 
 // ── Ingest (POST) ────────────────────────────────────────
 type IngestPayload =
-  | { vehicleno: string; type: 'can'; can: Record<string, unknown> }
+  | { vehicleno: string; type: 'can'; can: Record<string, unknown>; fault_bytes?: number[]; alarm_levels_raw?: number[] }
   | { vehicleno: string; type: 'gps'; data: { latitude: number; longitude: number } };
 
 function num(v: unknown, fallback = 0): number {
@@ -381,6 +394,10 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
       battery_high_temp_telltale: boolKeys(c, ['battery_high_temp_telltale'], false),
       hv_critical_alert: boolKeys(c, ['hv_critical_alert'], false),
     };
+    // Decode + store the raw BMS fault frame (Data0..Data7) if present.
+    if (Array.isArray(payload.fault_bytes)) {
+      rec.faultBytes = payload.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
+    }
     rec.forcedStatus = undefined; // real data overrides any seeded forcing
     if (charging === 1) rec.lastChargeTs = now;
     pushHistory(rec, now);

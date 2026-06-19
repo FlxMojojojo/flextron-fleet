@@ -228,6 +228,87 @@
   font-weight: 500;
 }
 
+/* ── Critical fault banner ── */
+.critBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  background: linear-gradient(135deg, #C2410C 0%, #9A2D08 100%);
+  color: #fff;
+  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-5);
+  box-shadow: 0 4px 16px rgba(194,65,12,0.3);
+  animation: crit-pulse 1.8s ease-in-out infinite;
+}
+@keyframes crit-pulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(194,65,12,0.3); }
+  50%      { box-shadow: 0 4px 24px rgba(194,65,12,0.55); }
+}
+@media (prefers-reduced-motion: reduce) { .critBanner { animation: none; } }
+.critBannerText { display: flex; flex-direction: column; gap: 2px; }
+.critBannerText strong {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  letter-spacing: 0.03em;
+}
+.critBannerText span {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  opacity: 0.92;
+}
+
+/* ── Fault list ── */
+.faultCount {
+  display: inline-flex;
+  gap: var(--sp-2);
+  margin-left: auto;
+  font-size: var(--text-xs);
+}
+.faultCountCrit, .faultCountWarn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+}
+.faultCountCrit { background: var(--c-status-alert-bg); color: var(--c-warn); }
+.faultCountWarn { background: #FEF6E7; color: #B45711; }
+
+.faultItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--c-surf-1);
+}
+.faultItem:last-child { border-bottom: none; }
+
+.sevChip {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  border-radius: var(--r-full);
+  margin-top: 1px;
+  white-space: nowrap;
+}
+.sevCrit { background: var(--c-status-alert-bg); color: var(--c-warn); border: 1px solid #F3C0AE; }
+.sevWarn { background: #FEF6E7; color: #B45711; border: 1px solid #F0DCB5; }
+.sevInfo { background: var(--c-surf-1); color: #475569; border: 1px solid var(--c-hairline); }
+
+.faultDesc {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--c-ink);
+}
+.faultCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+}
+
 /* ── Owner card ── */
 .ownerGrid {
   display: grid;

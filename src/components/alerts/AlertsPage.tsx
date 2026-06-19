@@ -15,18 +15,24 @@ interface AlertRow {
 function extractAlerts(vehicles: VehicleState[]): AlertRow[] {
   const rows: AlertRow[] = [];
   for (const v of vehicles) {
-    const { can, vehicleno, last_seen } = v;
-    if (can.hv_critical_alert) {
-      rows.push({ vehicleno, type: 'HV Critical Alert', detail: 'High-voltage system fault', ts: last_seen, severity: 'critical' });
+    const { vehicleno, last_seen } = v;
+
+    // Decoded BMS faults (authoritative, from the 0x040980 fault frame).
+    for (const f of v.faults ?? []) {
+      rows.push({
+        vehicleno,
+        type: f.description + (f.escalate ? ' ⚠' : ''),
+        detail: f.code,
+        ts: last_seen,
+        severity: f.severity === 'CRITICAL' ? 'critical' : 'warning',
+      });
     }
-    if (can.battery_high_temp_telltale) {
-      const t = Math.max(can.battery_temp_1, can.battery_temp_2, can.battery_temp_3, can.battery_temp_4);
-      rows.push({ vehicleno, type: 'High Temperature', detail: `Peak ${t.toFixed(1)}°C`, ts: last_seen, severity: 'critical' });
-    }
+
+    // Derived advisory (cell imbalance heuristic, not in fault_bytes).
     if (v.cell_delta > 0.3) {
-      rows.push({ vehicleno, type: 'Cell Imbalance', detail: `ΔV = ${v.cell_delta.toFixed(3)} V`, ts: last_seen, severity: 'critical' });
+      rows.push({ vehicleno, type: 'Cell Imbalance (derived)', detail: `ΔV = ${v.cell_delta.toFixed(3)} V`, ts: last_seen, severity: 'critical' });
     } else if (v.cell_delta > 0.1) {
-      rows.push({ vehicleno, type: 'Cell Delta Warning', detail: `ΔV = ${v.cell_delta.toFixed(3)} V`, ts: last_seen, severity: 'warning' });
+      rows.push({ vehicleno, type: 'Cell Delta Warning (derived)', detail: `ΔV = ${v.cell_delta.toFixed(3)} V`, ts: last_seen, severity: 'warning' });
     }
   }
   return rows.sort((a, b) => (a.severity === 'critical' ? -1 : 1) - (b.severity === 'critical' ? -1 : 1));
@@ -63,8 +69,9 @@ export function AlertsPage() {
           <thead>
             <tr>
               <th scope="col">Bike</th>
-              <th scope="col">Alert Type</th>
-              <th scope="col">Detail</th>
+              <th scope="col">Severity</th>
+              <th scope="col">Fault</th>
+              <th scope="col">Code / Detail</th>
               <th scope="col">Time</th>
             </tr>
           </thead>
@@ -81,14 +88,12 @@ export function AlertsPage() {
                   </button>
                 </td>
                 <td>
-                  <span className={s.alertBadge}>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-                      <path d="M5 1L9.5 9H0.5L5 1Z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-                    </svg>
-                    {a.type}
+                  <span className={`${s.sevTag} ${a.severity === 'critical' ? s.sevCrit : s.sevWarn}`}>
+                    {a.severity.toUpperCase()}
                   </span>
                 </td>
-                <td>{a.detail}</td>
+                <td>{a.type}</td>
+                <td><code className={s.detailCode}>{a.detail}</code></td>
                 <td><span className={s.ts}>{fmt(a.ts)}</span></td>
               </tr>
             ))}

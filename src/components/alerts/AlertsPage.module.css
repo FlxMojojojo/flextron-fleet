@@ -93,3 +93,22 @@
   font-size: var(--text-xs);
   color: #94A3B8;
 }
+
+.sevTag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  white-space: nowrap;
+}
+.sevCrit { background: var(--c-alert-bg); color: var(--c-warn); border: 1px solid #F3C0AE; }
+.sevWarn { background: #FEF6E7; color: #B45711; border: 1px solid #F0DCB5; }
+
+.detailCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+}

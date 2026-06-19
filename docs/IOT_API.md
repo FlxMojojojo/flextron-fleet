@@ -110,6 +110,29 @@ If your firmware can't yet send the array, you may send only `max_v`/`min_v` and
 the dashboard will approximate the cells — but **sending the real array is
 strongly preferred** for accurate per-cell display and imbalance detection.
 
+### Battery fault frame (`fault_bytes`)
+
+Add the raw 8-byte Daly fault frame **`0x040980`** as a top-level field
+`fault_bytes` (sibling of `can`), exactly as received — `[Data0..Data7]`, no
+decoding on the device. The server decodes all 58 fault flags and shows them on
+the bike's page immediately.
+
+```json
+{
+  "vehicleno": "FLT00003",
+  "type": "can",
+  "fault_bytes": [0, 0, 0, 0, 0, 0, 0, 0],
+  "can": { ...telemetry as above... }
+}
+```
+
+- Each byte is 8 fault bits (`0 = OK`, `1 = active`). `[0,0,0,0,0,0,0,0]` = all clear.
+- Example: `fault_bytes[6] = 64` (`0x40`, bit 6) → `THERMAL_RUNAWAY` (critical).
+- **Send on change + a heartbeat every minute** so "all clear" and "offline"
+  never look the same.
+- `alarm_levels_raw` (from frame `0x040E80`) is accepted but optional — send it
+  only if you implement graded severity later.
+
 ### Booleans are flexible
 
 `chg_mos`, `dischg_mos`, the telltales, etc. accept any of:
