@@ -159,8 +159,8 @@ export function BikeDetail() {
             <span className={s.gaugeLabel}>Range (DTE)</span>
           </div>
           <div className={s.gauge}>
-            <span className={s.gaugeValue}>{can.vehicle_speed.toFixed(1)}<span className={s.gaugeUnit}> km/h</span></span>
-            <span className={s.gaugeLabel}>Speed</span>
+            <span className={`${s.gaugeValue} ${s.cyan}`}>{v.gps_speed_kmh.toFixed(1)}<span className={s.gaugeUnit}> km/h</span></span>
+            <span className={s.gaugeLabel}>Speed (GPS)</span>
           </div>
           <div className={s.gauge}>
             <span className={`${s.gaugeValue}${can.battery_high_temp_telltale ? ' ' + s.warn : ' ' + s.good}`}>

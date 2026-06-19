@@ -55,8 +55,10 @@ interface InternalRecord {
   gps: GpsTelemetry;
   forcedStatus?: VehicleStatus;
   lastChargeTs: number | null; // last time charging_status === 1
-  gpsDistanceKm: number;       // accumulated from GPS deltas only
-  prevGps: { lat: number; lng: number } | null;
+  gpsDistanceKm: number;       // accumulated from GPS deltas only (jitter-filtered)
+  prevGps: { lat: number; lng: number; ts: number } | null;
+  gpsSpeedKmh: number;         // instantaneous speed derived from GPS
+  lastGpsTs: number;           // ts of the last valid GPS fix
   faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
   history: { ts: number; soc: number; sum_voltage: number; battery_temp_1: number; discharge_current: number }[];
 }
@@ -79,6 +81,8 @@ function toVehicleState(id: string, rec: InternalRecord): VehicleState {
   const stale = now - rec.can.ts > OFFLINE_AFTER_MS;
   const faults = decodeFaults(rec.faultBytes);
   const hasCritical = faults.some(f => f.severity === 'CRITICAL');
+  // Speed decays to 0 if no recent GPS fix (vehicle parked / GPS dropped).
+  const gpsSpeed = (now - (rec.lastGpsTs ?? 0)) > GPS_STALE_MS ? 0 : (rec.gpsSpeedKmh ?? 0);
   return {
     vehicleno: id,
     can: rec.can,
@@ -88,6 +92,7 @@ function toVehicleState(id: string, rec: InternalRecord): VehicleState {
     last_seen: rec.can.ts,
     hours_since_charge: rec.lastChargeTs == null ? null : parseFloat(((now - rec.lastChargeTs) / 3_600_000).toFixed(2)),
     gps_distance_km: parseFloat(rec.gpsDistanceKm.toFixed(3)),
+    gps_speed_kmh: parseFloat(gpsSpeed.toFixed(1)),
     faults,
     fault_bytes: rec.faultBytes,
   };
@@ -181,7 +186,9 @@ function init() {
       forcedStatus: seed.forced,
       lastChargeTs: seed.forced === 'charging' ? now : now - rnd(0.5, 9, 2) * 3_600_000,
       gpsDistanceKm: parseFloat(rnd(0, 12, 2).toFixed(2)),
-      prevGps: { lat: gps.latitude, lng: gps.longitude },
+      prevGps: { lat: gps.latitude, lng: gps.longitude, ts: now },
+      gpsSpeedKmh: 0,
+      lastGpsTs: now,
       faultBytes,
       history,
     });
@@ -265,11 +272,39 @@ export function startSimulation() {
   }, 3000);
 }
 
+// ── GPS-derived distance & speed (server-side, lat/long only) ──
+const MIN_MOVE_KM = 0.008;   // ignore movements below ~8 m → filters stationary GPS jitter
+const MAX_SPEED_KMH = 120;   // reject segments implying impossible speed → filters GPS glitches
+const GPS_STALE_MS = 30_000; // if no GPS fix within this window, report speed 0
+
+/** Valid WGS84 fix that isn't the null-island 0,0 sentinel. */
+function isValidCoord(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+    && !(lat === 0 && lng === 0);
+}
+
 function applyGps(rec: InternalRecord, lat: number, lng: number, ts: number) {
-  if (rec.prevGps) {
-    rec.gpsDistanceKm += haversineKm(rec.prevGps.lat, rec.prevGps.lng, lat, lng);
+  if (!isValidCoord(lat, lng)) return; // drop invalid / null-island fixes entirely
+
+  const prev = rec.prevGps;
+  if (prev && Number.isFinite(prev.ts)) {
+    const segKm = haversineKm(prev.lat, prev.lng, lat, lng);
+    const dtHr = Math.max((ts - prev.ts) / 3_600_000, 1e-9);
+    const speed = segKm / dtHr;
+
+    if (segKm >= MIN_MOVE_KM && speed <= MAX_SPEED_KMH) {
+      // Real movement: accumulate distance and report GPS speed.
+      rec.gpsDistanceKm += segKm;
+      rec.gpsSpeedKmh = parseFloat(speed.toFixed(1));
+    } else {
+      // Stationary jitter (too small) or glitch (too fast): no distance, speed 0.
+      rec.gpsSpeedKmh = 0;
+    }
   }
-  rec.prevGps = { lat, lng };
+
+  rec.prevGps = { lat, lng, ts };
+  rec.lastGpsTs = ts;
   rec.gps = { vehicleno: rec.gps.vehicleno, ts, latitude: lat, longitude: lng };
 }
 
@@ -340,6 +375,8 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
       lastChargeTs: null,
       gpsDistanceKm: 0,
       prevGps: null,
+      gpsSpeedKmh: 0,
+      lastGpsTs: 0,
       history: [],
     };
     store.set(id, rec);

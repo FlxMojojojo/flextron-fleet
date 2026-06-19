@@ -68,6 +68,7 @@ export interface VehicleState {
   last_seen: number;
   hours_since_charge: number | null; // hours since charging_status was last 1
   gps_distance_km: number;           // distance traveled, derived from GPS points only
+  gps_speed_kmh: number;             // speed derived from GPS (lat/long over time)
   owner?: Owner | null;              // mapped owner, attached by the API layer
   faults: Fault[];                   // decoded active BMS faults (from fault_bytes)
   fault_bytes?: number[];            // raw 8-byte fault frame as received
