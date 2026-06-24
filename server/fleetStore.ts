@@ -644,12 +644,21 @@ export function getVehicle(id: string): VehicleState | null {
   return vs;
 }
 
-/** GPS breadcrumb trail (points after the last manual reset), ordered by time. */
+/** GPS breadcrumb trail, derived from the stored history (after the last manual
+ *  reset). De-dupes near-identical consecutive fixes so the line stays clean. */
 export function getPath(id: string): { ts: number; lat: number; lng: number }[] {
   const rec = store.get(id);
-  if (!rec?.gpsPath) return [];
+  if (!rec) return [];
   const after = rec.pathResetTs ?? 0;
-  return rec.gpsPath.filter(p => p.ts >= after);
+  const out: { ts: number; lat: number; lng: number }[] = [];
+  let last: { lat: number; lng: number } | null = null;
+  for (const h of rec.history) {
+    if (!h.gps_valid || h.lat == null || h.lng == null || h.ts < after) continue;
+    if (last && haversineKm(last.lat, last.lng, h.lat, h.lng) * 1000 < 5) continue; // skip <5 m dupes
+    out.push({ ts: h.ts, lat: h.lat, lng: h.lng });
+    last = { lat: h.lat, lng: h.lng };
+  }
+  return out;
 }
 
 /** Clear the visible GPS trail (keeps tracking new movement from now). */
