@@ -36,18 +36,24 @@ function buildCsv(vehicleno: string, rows: ReturnType<typeof getRichHistory>): s
     const s = String(v ?? '');
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : '');
   const lines = [headers.join(',')];
   for (const r of rows) {
+    // Tolerate legacy/partial history rows that predate the rich schema.
     const charging = r.charging_status === 1;
-    const charge_a = charging ? Math.abs(r.discharge_current) : 0;
-    const discharge_a = charging ? 0 : r.discharge_current;
-    const alert = r.fault_hex && /[1-9a-f]/.test(r.fault_hex) ? 'FAULT' : 'OK';
+    const dc = typeof r.discharge_current === 'number' ? r.discharge_current : 0;
+    const charge_a = charging ? Math.abs(dc) : 0;
+    const discharge_a = charging ? 0 : dc;
+    const cells = Array.isArray(r.cell_voltages) ? r.cell_voltages : [];
+    const delta = (typeof r.max_v === 'number' && typeof r.min_v === 'number') ? (r.max_v - r.min_v).toFixed(3) : '';
+    const faultHex = typeof r.fault_hex === 'string' ? r.fault_hex : '';
+    const alert = faultHex && /[1-9a-f]/.test(faultHex) ? 'FAULT' : 'OK';
     lines.push([
-      new Date(r.ts).toISOString(), vehicleno, r.soc, r.soh, r.sum_voltage,
-      charge_a, discharge_a, r.max_v, r.min_v, (r.max_v - r.min_v).toFixed(3),
-      r.cell_voltages.join('|'), r.battery_temp_1, r.battery_temp_2, r.battery_temp_3, r.battery_temp_4, r.cycle_count,
+      r.ts ? new Date(r.ts).toISOString() : '', vehicleno, n(r.soc), n(r.soh), n(r.sum_voltage),
+      n(charge_a), n(discharge_a), n(r.max_v), n(r.min_v), delta,
+      cells.join('|'), n(r.battery_temp_1), n(r.battery_temp_2), n(r.battery_temp_3), n(r.battery_temp_4), n(r.cycle_count),
       r.lat ?? '', r.lng ?? '', r.gps_valid ? 'valid' : 'no_fix', r.chg_mos ? 'ON' : 'OFF', r.dischg_mos ? 'ON' : 'OFF',
-      r.fault_hex || '00'.repeat(8), alert,
+      faultHex || '00'.repeat(8), alert,
     ].map(esc).join(','));
   }
   return lines.join('\n');
