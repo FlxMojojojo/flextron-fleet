@@ -213,7 +213,44 @@
 }
 
 @media (max-width: 768px) {
-  .root { flex-direction: column; }
-  .sidebar { width: 100%; height: 260px; border-right: none; border-bottom: 1px solid var(--c-hairline); }
-  .strip { left: var(--sp-2); right: var(--sp-2); top: var(--sp-2); flex-wrap: wrap; }
+  .root {
+    flex-direction: column;
+    overflow-y: auto;        /* let the whole page scroll on mobile */
+    overflow-x: hidden;
+  }
+
+  /* Summary strip flows inline (no overlap) as a compact 4-up row */
+  .strip {
+    position: static;
+    inset: auto;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--sp-2);
+    padding: var(--sp-3) var(--sp-3) 0;
+    pointer-events: auto;
+  }
+  .stat {
+    min-width: 0;
+    padding: var(--sp-2) var(--sp-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-sm);
+    align-items: center;
+    text-align: center;
+    gap: 1px;
+  }
+  .statValue { font-size: var(--text-lg); }
+  .statLabel { font-size: 9px; letter-spacing: 0.04em; }
+
+  /* Bike list: flexible, scrolls internally, doesn't dominate the screen */
+  .sidebar {
+    width: 100%;
+    height: auto;
+    flex: none;
+    border-right: none;
+    border-bottom: 1px solid var(--c-hairline);
+  }
+  .bikeList { max-height: 38vh; }
+
+  /* Map gets a real, usable height below the list */
+  .mapWrap { width: 100%; height: 56vh; min-height: 320px; flex: none; }
 }
