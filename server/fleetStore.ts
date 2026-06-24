@@ -61,6 +61,11 @@ interface InternalRecord {
   gpsSpeedKmh: number;         // instantaneous speed derived from GPS
   lastGpsTs: number;           // ts of the last valid GPS fix
   faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
+  // Batch sync / cumulative-ACK tracking (ESP32 offline buffering)
+  ackedSeq?: number;           // highest CONTIGUOUS committed sequence_id
+  pendingSeqs?: number[];      // committed sequences above ackedSeq (gap buffer)
+  lastAppliedSeq?: number;     // highest sequence applied to the LIVE state
+  lastGpsSeq?: number;         // highest sequence whose GPS was applied
   history: { ts: number; soc: number; sum_voltage: number; battery_temp_1: number; discharge_current: number }[];
 }
 
@@ -384,60 +389,12 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
   }
 
   if (payload.type === 'can') {
-    const c = payload.can;
-
-    // Cell voltages: prefer the device-provided array (supports any pack size,
-    // e.g. 20S or 24S). Fall back to synthesizing from min/max for legacy senders.
-    const rawCells = firstDefined(c, ['cell_voltages', 'cellVoltages', 'CellVoltages']);
-    let cells: number[];
-    if (Array.isArray(rawCells) && rawCells.length > 0) {
-      cells = rawCells.map(x => parseFloat(num(x).toFixed(3)));
-    } else {
-      cells = rec.can.cell_voltages.length ? rec.can.cell_voltages : buildCells(3.2, 3.4);
-    }
-
-    // Use provided max/min/sum if present, otherwise derive from the cells.
-    const provMax = firstDefined(c, ['max_v', 'MaxV']);
-    const provMin = firstDefined(c, ['min_v', 'MinV']);
-    const provSum = firstDefined(c, ['sum_voltage', 'SumVoltage']);
-    const max_v = provMax !== undefined ? num(provMax) : parseFloat(Math.max(...cells).toFixed(3));
-    const min_v = provMin !== undefined ? num(provMin) : parseFloat(Math.min(...cells).toFixed(3));
-    const sum_voltage = provSum !== undefined ? num(provSum)
-      : parseFloat(cells.reduce((a, b) => a + b, 0).toFixed(2));
-
-    const charging = numKeys(c, ['charging_status'], rec.can.charging_status);
-    rec.can = {
-      ...rec.can,
-      vehicleno: id,
-      ts: now,
-      soc: numKeys(c, ['soc'], rec.can.soc),
-      soh: numKeys(c, ['soh'], rec.can.soh),
-      cycle_count: numKeys(c, ['cycle_count'], rec.can.cycle_count),
-      sum_voltage,
-      max_v, min_v,
-      cell_voltages: cells,
-      discharge_current: numKeys(c, ['discharge_current', 'Discharge Current'], rec.can.discharge_current),
-      charging_status: charging,
-      chg_mos: boolKeys(c, ['chg_mos', 'ChgMOS'], rec.can.chg_mos),
-      dischg_mos: boolKeys(c, ['dischg_mos', 'DisChgMOS'], rec.can.dischg_mos),
-      remain_cap: numKeys(c, ['remain_cap', 'RemainCap'], rec.can.remain_cap),
-      dte: numKeys(c, ['dte'], rec.can.dte),
-      odometer: numKeys(c, ['odometer'], rec.can.odometer),
-      vehicle_speed: numKeys(c, ['vehicle_speed'], rec.can.vehicle_speed),
-      fast_charge_indicator: boolKeys(c, ['fast_charge_indicator'], rec.can.fast_charge_indicator),
-      battery_temp_1: numKeys(c, ['battery_temp_1', 'battery_temp'], rec.can.battery_temp_1),
-      battery_temp_2: numKeys(c, ['battery_temp_2', 'battery_temp 2'], rec.can.battery_temp_2),
-      battery_temp_3: numKeys(c, ['battery_temp_3', 'battery_temp 3'], rec.can.battery_temp_3),
-      battery_temp_4: numKeys(c, ['battery_temp_4', 'battery_temp 4'], rec.can.battery_temp_4),
-      battery_high_temp_telltale: boolKeys(c, ['battery_high_temp_telltale'], false),
-      hv_critical_alert: boolKeys(c, ['hv_critical_alert'], false),
-    };
-    // Decode + store the raw BMS fault frame (Data0..Data7) if present.
+    rec.can = composeCan(rec.can, payload.can, id, now);
     if (Array.isArray(payload.fault_bytes)) {
       rec.faultBytes = payload.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
     }
     rec.forcedStatus = undefined; // real data overrides any seeded forcing
-    if (charging === 1) rec.lastChargeTs = now;
+    if (rec.can.charging_status === 1) rec.lastChargeTs = now;
     pushHistory(rec, now);
   } else if (payload.type === 'gps') {
     applyGps(rec, num(payload.data.latitude), num(payload.data.longitude), now);
@@ -445,6 +402,158 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
   }
   scheduleSave();
   return { ok: true, vehicleno: id };
+}
+
+/** Build a CanTelemetry from a flat field source (used by single + batch ingest). */
+function composeCan(prev: CanTelemetry, c: Record<string, unknown>, id: string, ts: number): CanTelemetry {
+  // Cell voltages: prefer the device-provided array (any pack size, 20S/24S);
+  // fall back to synthesizing from min/max for legacy senders.
+  const rawCells = firstDefined(c, ['cell_voltages', 'cellVoltages', 'CellVoltages']);
+  let cells: number[];
+  if (Array.isArray(rawCells) && rawCells.length > 0) {
+    cells = rawCells.map(x => parseFloat(num(x).toFixed(3)));
+  } else {
+    cells = prev.cell_voltages.length ? prev.cell_voltages : buildCells(3.2, 3.4);
+  }
+
+  const provMax = firstDefined(c, ['max_v', 'MaxV']);
+  const provMin = firstDefined(c, ['min_v', 'MinV']);
+  const provSum = firstDefined(c, ['sum_voltage', 'SumVoltage']);
+  const max_v = provMax !== undefined ? num(provMax) : parseFloat(Math.max(...cells).toFixed(3));
+  const min_v = provMin !== undefined ? num(provMin) : parseFloat(Math.min(...cells).toFixed(3));
+  const sum_voltage = provSum !== undefined ? num(provSum)
+    : parseFloat(cells.reduce((a, b) => a + b, 0).toFixed(2));
+
+  return {
+    ...prev,
+    vehicleno: id,
+    ts,
+    soc: numKeys(c, ['soc'], prev.soc),
+    soh: numKeys(c, ['soh'], prev.soh),
+    cycle_count: numKeys(c, ['cycle_count'], prev.cycle_count),
+    sum_voltage,
+    max_v, min_v,
+    cell_voltages: cells,
+    discharge_current: numKeys(c, ['discharge_current', 'Discharge Current'], prev.discharge_current),
+    charging_status: numKeys(c, ['charging_status'], prev.charging_status),
+    chg_mos: boolKeys(c, ['chg_mos', 'ChgMOS'], prev.chg_mos),
+    dischg_mos: boolKeys(c, ['dischg_mos', 'DisChgMOS'], prev.dischg_mos),
+    remain_cap: numKeys(c, ['remain_cap', 'RemainCap'], prev.remain_cap),
+    dte: numKeys(c, ['dte'], prev.dte),
+    odometer: numKeys(c, ['odometer'], prev.odometer),
+    vehicle_speed: numKeys(c, ['vehicle_speed'], prev.vehicle_speed),
+    fast_charge_indicator: boolKeys(c, ['fast_charge_indicator'], prev.fast_charge_indicator),
+    battery_temp_1: numKeys(c, ['battery_temp_1', 'battery_temp'], prev.battery_temp_1),
+    battery_temp_2: numKeys(c, ['battery_temp_2', 'battery_temp 2'], prev.battery_temp_2),
+    battery_temp_3: numKeys(c, ['battery_temp_3', 'battery_temp 3'], prev.battery_temp_3),
+    battery_temp_4: numKeys(c, ['battery_temp_4', 'battery_temp 4'], prev.battery_temp_4),
+    battery_high_temp_telltale: boolKeys(c, ['battery_high_temp_telltale'], false),
+    hv_critical_alert: boolKeys(c, ['hv_critical_alert'], false),
+  };
+}
+
+interface BatchRecord {
+  sequence_id: number;
+  timestamp?: number;       // device epoch seconds (or ms)
+  fault_bytes?: number[];
+  gps_valid?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  [k: string]: unknown;     // flat battery fields (soc, sum_voltage, …)
+}
+
+/**
+ * Batched, idempotent ingest with a cumulative-ACK contract (ESP32 offline
+ * buffering design). Records are de-duplicated on (vehicleno, sequence_id),
+ * applied in sequence order, and the highest CONTIGUOUS committed sequence is
+ * returned so the device can advance its tail safely.
+ */
+export function ingestBatch(vehicleno: string, records: BatchRecord[]): { success: true; acked_seq: number } {
+  const id = vehicleno;
+  const now = Date.now();
+  let rec = store.get(id);
+  if (!rec) {
+    const min_v = 3.2, max_v = 3.4;
+    rec = {
+      can: {
+        vehicleno: id, ts: now, soc: 0, soh: 100, cycle_count: 0,
+        sum_voltage: 0, max_v, min_v, cell_voltages: buildCells(min_v, max_v),
+        discharge_current: 0, charging_status: 0, chg_mos: false, dischg_mos: false,
+        remain_cap: 0, dte: 0, odometer: 0, vehicle_speed: 0, fast_charge_indicator: false,
+        battery_temp_1: 0, battery_temp_2: 0, battery_temp_3: 0, battery_temp_4: 0,
+        battery_high_temp_telltale: false, hv_critical_alert: false,
+      },
+      gps: { vehicleno: id, ts: now, latitude: BLR_LAT, longitude: BLR_LNG },
+      lastChargeTs: null, gpsDistanceKm: 0, prevGps: null, gpsSpeedKmh: 0, lastGpsTs: 0,
+      history: [],
+    };
+    store.set(id, rec);
+  }
+
+  const valid = records
+    .filter(r => r && Number.isFinite(Number(r.sequence_id)))
+    .map(r => ({ ...r, sequence_id: Number(r.sequence_id) }))
+    .sort((a, b) => a.sequence_id - b.sequence_id);
+  if (valid.length === 0) return { success: true, acked_seq: rec.ackedSeq ?? 0 };
+
+  // First contact: baseline the ack pointer just below this device's lowest seq.
+  if (rec.ackedSeq === undefined) rec.ackedSeq = valid[0].sequence_id - 1;
+  if (!rec.pendingSeqs) rec.pendingSeqs = [];
+  const pending = new Set(rec.pendingSeqs);
+
+  for (const r of valid) {
+    const seq = r.sequence_id;
+    if (seq <= rec.ackedSeq || pending.has(seq)) continue; // idempotent: already committed
+
+    // Apply battery telemetry. Only the newest seq updates the LIVE state;
+    // older backlog records still contribute to history.
+    const isNewest = seq >= (rec.lastAppliedSeq ?? -Infinity);
+    const devTs = deviceTs(r.timestamp, now);
+    const newCan = composeCan(rec.can, r as Record<string, unknown>, id, isNewest ? now : rec.can.ts);
+    if (isNewest) {
+      rec.can = newCan;
+      rec.forcedStatus = undefined;
+      rec.lastAppliedSeq = seq;
+      if (Array.isArray(r.fault_bytes)) rec.faultBytes = r.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
+      if (newCan.charging_status === 1) rec.lastChargeTs = now;
+    }
+    // History point uses the device measurement time so backlog fills correctly.
+    rec.history.push({
+      ts: devTs,
+      soc: newCan.soc, sum_voltage: newCan.sum_voltage,
+      battery_temp_1: newCan.battery_temp_1, discharge_current: newCan.discharge_current,
+    });
+
+    // GPS only when valid and only moving forward in sequence (keeps distance sane).
+    if (r.gps_valid && r.latitude != null && r.longitude != null && seq > (rec.lastGpsSeq ?? -Infinity)) {
+      applyGps(rec, num(r.latitude), num(r.longitude), devTs);
+      rec.lastGpsSeq = seq;
+    }
+
+    pending.add(seq);
+  }
+
+  // Advance the contiguous ACK pointer through committed sequences.
+  while (pending.has(rec.ackedSeq + 1)) {
+    rec.ackedSeq++;
+    pending.delete(rec.ackedSeq);
+  }
+  // Keep only the still-pending (gap) sequences, bounded for safety.
+  rec.pendingSeqs = [...pending].sort((a, b) => a - b).slice(-1000);
+  if (rec.history.length > 200) rec.history = rec.history.slice(-200).sort((a, b) => a.ts - b.ts);
+
+  scheduleSave();
+  return { success: true, acked_seq: rec.ackedSeq };
+}
+
+/** Device epoch (seconds or ms) → ms; falls back to receive time if implausible. */
+function deviceTs(ts: number | undefined, fallback: number): number {
+  if (!Number.isFinite(ts as number)) return fallback;
+  let ms = Number(ts);
+  if (ms < 1e12) ms *= 1000; // seconds → ms
+  // Reject clearly bad clocks (before 2020 or far future); use receive time.
+  if (ms < 1_577_836_800_000 || ms > fallback + 86_400_000) return fallback;
+  return ms;
 }
 
 /** Remove a vehicle and its history. It re-registers if the device posts again. */

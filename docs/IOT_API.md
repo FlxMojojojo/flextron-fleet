@@ -140,6 +140,68 @@ the bike's page immediately.
 
 ---
 
+## 2b. Batched ingest (offline buffering) — `/api/telemetry/batch`
+
+For the ESP32 offline-first buffer: drain the on-device ring to the cloud in
+small batches over one kept-alive connection. The server is **idempotent on
+`(vehicleno, sequence_id)`**, **orders by `sequence_id`**, and replies with the
+highest **contiguous** committed sequence so the device advances its tail safely.
+
+```
+POST https://track.ft.energy/api/telemetry/batch    (alias: /api/v1/telemetry/batch)
+Content-Type: application/json
+Authorization: Bearer <INGEST_TOKEN>
+```
+
+**Request** — `records[]` carries one telemetry record per buffered sample. Each
+record uses the **same flat battery field names as the CAN payload above**, plus
+`sequence_id`, `timestamp`, `fault_bytes`, and `gps_valid` / `latitude` /
+`longitude` (lat/lon `null` when there's no fix):
+
+```json
+{
+  "vehicleno": "FLT12345",
+  "records": [
+    {
+      "sequence_id": 12340, "timestamp": 1718452030,
+      "soc": 50.0, "soh": 98, "sum_voltage": 49.2,
+      "cell_voltages": [3.30, "…", 3.33],
+      "discharge_current": 25, "charging_status": 0,
+      "battery_temp_1": 31, "battery_temp_2": 32, "battery_temp_3": 30, "battery_temp_4": 31,
+      "fault_bytes": [0,0,0,0,0,0,0,0],
+      "gps_valid": true, "latitude": 12.9204702, "longitude": 77.6508026, "priority": false
+    },
+    {
+      "sequence_id": 12341, "timestamp": 1718452032, "priority": true,
+      "soc": 50.0, "fault_bytes": [0,0,0,0,0,0,64,0],
+      "gps_valid": false, "latitude": null, "longitude": null
+    }
+  ]
+}
+```
+
+**Response** — the highest **contiguous** sequence committed:
+
+```json
+{ "success": true, "acked_seq": 12341 }
+```
+
+**Contract the firmware relies on:**
+- **Advance `tail` only to `acked_seq`.** Anything beyond a gap is retried.
+- **Re-sends are safe.** A record whose ACK was lost can be re-sent; it's
+  de-duplicated on `(vehicleno, sequence_id)` — no duplicates, no double count.
+- **Order doesn't matter.** Priority/fault records may arrive first; the server
+  sorts by `sequence_id`. Records before `tail`'s contiguous prefix are held
+  (committed) but not ACKed until the gap fills.
+- **Partial ACK:** if you send 12340–12344 and only 12340–12342 are contiguous,
+  `acked_seq` = 12342; re-send 12343+.
+- `timestamp` is device epoch **seconds** (ms also accepted); used for the
+  history chart. The server also records its own receive time for the live view.
+- Send `priority: true` on critical-fault records so they drain first (optional;
+  the server flags faults from `fault_bytes` regardless).
+
+Single-post `/api/ingest` (above) still works for live, non-buffered sending.
+
 ## 3. GPS payload
 
 Send on your location interval (recommended **every 5–15 s**). Distance traveled

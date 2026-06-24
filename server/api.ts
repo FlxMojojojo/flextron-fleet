@@ -11,7 +11,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, getVehicles, getVehicle, getHistory, deleteVehicle, resetTrip,
+  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, deleteVehicle, resetTrip,
 } from './fleetStore';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
@@ -89,6 +89,14 @@ function currentUser(req: IncomingMessage): User | null {
   return token ? verifyToken(token) : null;
 }
 
+/** Machine-ingest auth: a configured INGEST_TOKEN (Bearer or x-api-key) or a logged-in user. */
+function ingestAuthorized(req: IncomingMessage): boolean {
+  const key = typeof req.headers['x-api-key'] === 'string' ? cleanToken(req.headers['x-api-key'] as string) : undefined;
+  const bearerTok = bearer(req);
+  const okToken = INGEST_TOKENS.some(t => t === bearerTok || t === key);
+  return okToken || !!currentUser(req) || INGEST_TOKENS.length === 0;
+}
+
 /**
  * Handle an /api/* request. Returns true if it consumed the request.
  * `pathname` must include the /api prefix (e.g. "/api/vehicles").
@@ -151,6 +159,31 @@ export async function handleApi(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = ingest(payload as any);
     logApi({ ts: Date.now(), ip, method, path: pathname, type: payload.type ?? null, vehicleno: payload.vehicleno ?? null, status: 200, ok: true, body: payload });
+    sendJson(res, 200, result);
+    return true;
+  }
+
+  // ── Batched ingest with cumulative-ACK (ESP32 offline buffering) ──
+  if (method === 'POST' && (path === '/telemetry/batch' || path === '/v1/telemetry/batch')) {
+    const ip = clientIp(req);
+    if (!ingestAuthorized(req)) {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: 'batch', vehicleno: null, status: 401, ok: false, error: 'unauthorized', body: null });
+      return sendJson(res, 401, { success: false, error: 'unauthorized' }), true;
+    }
+    let body: { vehicleno?: string; records?: unknown[] } = {};
+    try {
+      body = await readBody(req) as { vehicleno?: string; records?: unknown[] };
+    } catch {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: 'batch', vehicleno: null, status: 400, ok: false, error: 'invalid JSON', body: null });
+      return sendJson(res, 400, { success: false, error: 'invalid JSON' }), true;
+    }
+    if (!body?.vehicleno || !Array.isArray(body.records)) {
+      logApi({ ts: Date.now(), ip, method, path: pathname, type: 'batch', vehicleno: body?.vehicleno ?? null, status: 400, ok: false, error: 'vehicleno and records[] are required', body });
+      return sendJson(res, 400, { success: false, error: 'vehicleno and records[] are required' }), true;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = ingestBatch(body.vehicleno, body.records as any[]);
+    logApi({ ts: Date.now(), ip, method, path: pathname, type: 'batch', vehicleno: body.vehicleno, status: 200, ok: true, body: { vehicleno: body.vehicleno, count: body.records.length, acked_seq: result.acked_seq } });
     sendJson(res, 200, result);
     return true;
   }
