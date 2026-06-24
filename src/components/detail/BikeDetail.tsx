@@ -175,6 +175,10 @@ export function BikeDetail() {
             <span className={s.gaugeLabel}>Range (DTE)</span>
           </div>
           <div className={s.gauge}>
+            <span className={`${s.gaugeValue} ${s.cyan}`}>{can.remain_cap.toFixed(1)}<span className={s.gaugeUnit}> Ah</span></span>
+            <span className={s.gaugeLabel}>Remaining Capacity</span>
+          </div>
+          <div className={s.gauge}>
             <span className={`${s.gaugeValue} ${isCharging ? s.good : s.warn}`}>
               {isCharging ? '+' : '−'}{currentMag.toFixed(1)}<span className={s.gaugeUnit}> A</span>
             </span>
