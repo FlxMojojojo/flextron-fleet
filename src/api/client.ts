@@ -121,6 +121,47 @@ export function getApiLogs(limit = 200): Promise<ApiLogEntry[]> {
   return request<ApiLogEntry[]>(`/api/logs?limit=${limit}`);
 }
 
+// ── Alert log (persistent) ──
+export interface AlertLogEntry {
+  id: string;
+  vehicleno: string;
+  device_id: string;
+  code: string;
+  name: string;
+  severity: 'WARNING' | 'CRITICAL';
+  raised_at: number;
+  status: 'active' | 'acknowledged';
+  acknowledged_at?: number;
+  acknowledged_by?: string;
+}
+export function getAlertLog(id: string): Promise<AlertLogEntry[]> {
+  return request<AlertLogEntry[]>(`/api/vehicles/${encodeURIComponent(id)}/alerts`);
+}
+export function ackAlert(vehicleId: string, alertId: string): Promise<AlertLogEntry> {
+  return request<AlertLogEntry>(`/api/vehicles/${encodeURIComponent(vehicleId)}/alerts/${encodeURIComponent(alertId)}/ack`, { method: 'POST' });
+}
+
+// ── CSV export (auth-aware download) ──
+export type CsvRange = '24h' | '7d' | '30d' | 'all' | 'custom';
+export async function downloadCsv(id: string, range: CsvRange, from?: number, to?: number): Promise<void> {
+  const params = new URLSearchParams({ range });
+  if (range === 'custom' && from && to) { params.set('from', String(from)); params.set('to', String(to)); }
+  const token = getToken();
+  const res = await fetch(`${BASE_URL}/api/vehicles/${encodeURIComponent(id)}/export.csv?${params}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error(`Export failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${id}_telemetry_${range}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ── Telemetry ──
 export function getVehicles(): Promise<VehicleState[]> {
   return request<VehicleState[]>('/api/vehicles');

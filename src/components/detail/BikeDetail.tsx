@@ -8,6 +8,8 @@ import { SocRing } from './SocRing';
 import { CellChart } from './CellChart';
 import { TelemetryChart } from './TelemetryChart';
 import { MiniMap } from './MiniMap';
+import { AlertLogCard } from './AlertLogCard';
+import { ExportButton } from './ExportButton';
 import s from './BikeDetail.module.css';
 
 function fmt(ts: number) {
@@ -75,6 +77,8 @@ export function BikeDetail() {
   const faults = v.faults ?? [];
   const criticalFaults = faults.filter(f => f.severity === 'CRITICAL');
   const warningFaults = faults.filter(f => f.severity === 'WARNING');
+  const isCharging = can.charging_status === 1;
+  const currentMag = Math.abs(can.discharge_current);
 
   return (
     <div className={s.root}>
@@ -94,6 +98,7 @@ export function BikeDetail() {
           </div>
         </div>
         <StatusChip status={v.status} />
+        <ExportButton vehicleId={v.vehicleno} />
         {user?.role === 'admin' && (
           <button className={s.deleteBtn} onClick={onDelete} aria-label={`Delete device ${v.vehicleno}`}>
             <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -170,8 +175,10 @@ export function BikeDetail() {
             <span className={s.gaugeLabel}>Range (DTE)</span>
           </div>
           <div className={s.gauge}>
-            <span className={`${s.gaugeValue} ${s.cyan}`}>{v.gps_speed_kmh.toFixed(1)}<span className={s.gaugeUnit}> km/h</span></span>
-            <span className={s.gaugeLabel}>Speed (GPS)</span>
+            <span className={`${s.gaugeValue} ${isCharging ? s.good : s.warn}`}>
+              {isCharging ? '+' : '−'}{currentMag.toFixed(1)}<span className={s.gaugeUnit}> A</span>
+            </span>
+            <span className={s.gaugeLabel}>{isCharging ? 'Charge Current' : 'Discharge Current'}</span>
           </div>
           <div className={s.gauge}>
             <span className={`${s.gaugeValue}${can.battery_high_temp_telltale ? ' ' + s.warn : ' ' + s.good}`}>
@@ -323,6 +330,9 @@ export function BikeDetail() {
           </ul>
         )}
       </section>
+
+      {/* Persistent alert log (audit history) */}
+      <AlertLogCard vehicleId={v.vehicleno} />
     </div>
   );
 }

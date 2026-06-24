@@ -15,6 +15,17 @@ import type {
 } from '../src/types/telemetry';
 import { decodeFaults } from './faults';
 import { reverseGeocode } from './geocode';
+import { syncAlerts, type ActiveAlertInput } from './alertLog';
+
+/** Build the active-alert list for a vehicle and persist new ones to the audit log. */
+function captureAlerts(id: string, rec: InternalRecord): void {
+  const active: ActiveAlertInput[] = decodeFaults(rec.faultBytes)
+    .map(f => ({ code: f.code, name: f.description, severity: f.severity }));
+  if (rec.can.hv_critical_alert) active.push({ code: 'HV_CRITICAL', name: 'HV critical alert (BMS protection)', severity: 'CRITICAL' });
+  if (rec.can.battery_high_temp_telltale) active.push({ code: 'PACK_HIGH_TEMP_TELLTALE', name: 'Pack high-temperature telltale', severity: 'CRITICAL' });
+  if ((rec.can.max_v - rec.can.min_v) > 0.3) active.push({ code: 'CELL_IMBALANCE', name: 'Cell voltage imbalance', severity: 'CRITICAL' });
+  if (active.length) syncAlerts(id, id, active);
+}
 
 // ── Persistence ──────────────────────────────────────────
 // State survives restarts/reboots by snapshotting to disk. Override the
@@ -66,7 +77,31 @@ interface InternalRecord {
   pendingSeqs?: number[];      // committed sequences above ackedSeq (gap buffer)
   lastAppliedSeq?: number;     // highest sequence applied to the LIVE state
   lastGpsSeq?: number;         // highest sequence whose GPS was applied
-  history: { ts: number; soc: number; sum_voltage: number; battery_temp_1: number; discharge_current: number }[];
+  history: HistoryEntry[];
+}
+
+/** Rich per-sample snapshot — drives charts AND CSV export. */
+interface HistoryEntry {
+  ts: number;
+  soc: number;
+  soh: number;
+  sum_voltage: number;
+  max_v: number;
+  min_v: number;
+  discharge_current: number;
+  charging_status: number;
+  cycle_count: number;
+  battery_temp_1: number;
+  battery_temp_2: number;
+  battery_temp_3: number;
+  battery_temp_4: number;
+  chg_mos: boolean;
+  dischg_mos: boolean;
+  cell_voltages: number[];
+  fault_hex: string;
+  lat: number | null;
+  lng: number | null;
+  gps_valid: boolean;
 }
 
 const store = new Map<string, InternalRecord>();
@@ -170,16 +205,16 @@ function init() {
       latitude: parseFloat((BLR_LAT + seed.latOff).toFixed(6)),
       longitude: parseFloat((BLR_LNG + seed.lngOff).toFixed(6)),
     };
-    const history = Array.from({ length: 60 }, (_, i) => {
+    const history: HistoryEntry[] = Array.from({ length: 60 }, (_, i) => {
       const t = now - (60 - i) * 10_000;
       const decay = (60 - i) / 60;
-      return {
-        ts: t,
+      return snapshot({
+        ...can,
         soc: parseFloat((seed.soc + decay * rnd(-5, 2, 1)).toFixed(1)),
         sum_voltage: parseFloat((can.sum_voltage + decay * rnd(-0.5, 0.5, 2)).toFixed(2)),
         battery_temp_1: parseFloat((can.battery_temp_1 + decay * rnd(-1, 1, 1)).toFixed(1)),
         discharge_current: parseFloat((can.discharge_current + decay * rnd(-2, 2, 2)).toFixed(2)),
-      };
+      }, gps, undefined, t);
     });
     // Demo fault frames on the seeded alert bikes so the faults panel is
     // populated out of the box (real devices send their own fault_bytes).
@@ -273,6 +308,7 @@ export function startSimulation() {
         discharge_current: isCharge ? -rnd(2, 8, 2) : rnd(5, 22, 2),
       };
       if (isCharge) rec.lastChargeTs = now;
+      captureAlerts(seed.id, rec);
       pushHistory(rec, now);
     }
   }, 3000);
@@ -314,15 +350,34 @@ function applyGps(rec: InternalRecord, lat: number, lng: number, ts: number) {
   rec.gps = { vehicleno: rec.gps.vehicleno, ts, latitude: lat, longitude: lng };
 }
 
-function pushHistory(rec: InternalRecord, ts: number) {
-  rec.history.push({
+const HISTORY_CAP = 1000;
+
+function snapshot(can: CanTelemetry, gps: GpsTelemetry, faultBytes: number[] | undefined, ts: number): HistoryEntry {
+  const valid = isValidCoord(gps.latitude, gps.longitude);
+  return {
     ts,
-    soc: rec.can.soc,
-    sum_voltage: rec.can.sum_voltage,
-    battery_temp_1: rec.can.battery_temp_1,
-    discharge_current: rec.can.discharge_current,
-  });
-  if (rec.history.length > 200) rec.history.shift();
+    soc: can.soc, soh: can.soh, sum_voltage: can.sum_voltage,
+    max_v: can.max_v, min_v: can.min_v,
+    discharge_current: can.discharge_current, charging_status: can.charging_status,
+    cycle_count: can.cycle_count,
+    battery_temp_1: can.battery_temp_1, battery_temp_2: can.battery_temp_2,
+    battery_temp_3: can.battery_temp_3, battery_temp_4: can.battery_temp_4,
+    chg_mos: can.chg_mos, dischg_mos: can.dischg_mos,
+    cell_voltages: can.cell_voltages,
+    fault_hex: (faultBytes ?? []).map(b => (b & 0xff).toString(16).padStart(2, '0')).join(''),
+    lat: valid ? gps.latitude : null,
+    lng: valid ? gps.longitude : null,
+    gps_valid: valid,
+  };
+}
+
+function pushHistory(rec: InternalRecord, ts: number, can: CanTelemetry = rec.can) {
+  rec.history.push(snapshot(can, rec.gps, rec.faultBytes, ts));
+  if (rec.history.length > HISTORY_CAP) rec.history.shift();
+}
+
+export function getRichHistory(id: string): HistoryEntry[] {
+  return store.get(id)?.history ?? [];
 }
 
 // ── Ingest (POST) ────────────────────────────────────────
@@ -395,6 +450,7 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
     }
     rec.forcedStatus = undefined; // real data overrides any seeded forcing
     if (rec.can.charging_status === 1) rec.lastChargeTs = now;
+    captureAlerts(id, rec);
     pushHistory(rec, now);
   } else if (payload.type === 'gps') {
     applyGps(rec, num(payload.data.latitude), num(payload.data.longitude), now);
@@ -517,18 +573,16 @@ export function ingestBatch(vehicleno: string, records: BatchRecord[]): { succes
       if (Array.isArray(r.fault_bytes)) rec.faultBytes = r.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
       if (newCan.charging_status === 1) rec.lastChargeTs = now;
     }
-    // History point uses the device measurement time so backlog fills correctly.
-    rec.history.push({
-      ts: devTs,
-      soc: newCan.soc, sum_voltage: newCan.sum_voltage,
-      battery_temp_1: newCan.battery_temp_1, discharge_current: newCan.discharge_current,
-    });
-
-    // GPS only when valid and only moving forward in sequence (keeps distance sane).
+    // GPS first (so the history snapshot captures this record's position);
+    // only move forward in sequence to keep distance sane.
     if (r.gps_valid && r.latitude != null && r.longitude != null && seq > (rec.lastGpsSeq ?? -Infinity)) {
       applyGps(rec, num(r.latitude), num(r.longitude), devTs);
       rec.lastGpsSeq = seq;
     }
+
+    // Rich history point, using this record's own fault bytes + device time.
+    const recFaults = Array.isArray(r.fault_bytes) ? r.fault_bytes.slice(0, 8).map(n => Number(n) || 0) : rec.faultBytes;
+    rec.history.push(snapshot(newCan, rec.gps, recFaults, devTs));
 
     pending.add(seq);
   }
@@ -540,8 +594,9 @@ export function ingestBatch(vehicleno: string, records: BatchRecord[]): { succes
   }
   // Keep only the still-pending (gap) sequences, bounded for safety.
   rec.pendingSeqs = [...pending].sort((a, b) => a - b).slice(-1000);
-  if (rec.history.length > 200) rec.history = rec.history.slice(-200).sort((a, b) => a.ts - b.ts);
+  if (rec.history.length > HISTORY_CAP) rec.history = rec.history.slice(-HISTORY_CAP).sort((a, b) => a.ts - b.ts);
 
+  captureAlerts(id, rec);
   scheduleSave();
   return { success: true, acked_seq: rec.ackedSeq };
 }

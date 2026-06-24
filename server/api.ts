@@ -11,8 +11,9 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, deleteVehicle, resetTrip,
+  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getRichHistory, deleteVehicle, resetTrip,
 } from './fleetStore';
+import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
   listUsers, createUser, deleteUser, type User, type Role,
@@ -22,6 +23,35 @@ import {
 } from './owners';
 import { logApi, listApiLogs } from './apiLog';
 import type { HistoryMetric, VehicleState } from '../src/types/telemetry';
+
+/** Build a telemetry CSV from rich history rows. */
+function buildCsv(vehicleno: string, rows: ReturnType<typeof getRichHistory>): string {
+  const headers = [
+    'timestamp_iso', 'vehicleno', 'soc_pct', 'soh_pct', 'pack_voltage_v',
+    'charge_current_a', 'discharge_current_a', 'max_cell_v', 'min_cell_v', 'cell_delta_v',
+    'cell_voltages_v', 'temp1_c', 'temp2_c', 'temp3_c', 'temp4_c', 'cycle_count',
+    'latitude', 'longitude', 'gps_status', 'chg_mos', 'dischg_mos', 'fault_codes_hex', 'alert_status',
+  ];
+  const esc = (v: unknown) => {
+    const s = String(v ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.join(',')];
+  for (const r of rows) {
+    const charging = r.charging_status === 1;
+    const charge_a = charging ? Math.abs(r.discharge_current) : 0;
+    const discharge_a = charging ? 0 : r.discharge_current;
+    const alert = r.fault_hex && /[1-9a-f]/.test(r.fault_hex) ? 'FAULT' : 'OK';
+    lines.push([
+      new Date(r.ts).toISOString(), vehicleno, r.soc, r.soh, r.sum_voltage,
+      charge_a, discharge_a, r.max_v, r.min_v, (r.max_v - r.min_v).toFixed(3),
+      r.cell_voltages.join('|'), r.battery_temp_1, r.battery_temp_2, r.battery_temp_3, r.battery_temp_4, r.cycle_count,
+      r.lat ?? '', r.lng ?? '', r.gps_valid ? 'valid' : 'no_fix', r.chg_mos ? 'ON' : 'OFF', r.dischg_mos ? 'ON' : 'OFF',
+      r.fault_hex || '00'.repeat(8), alert,
+    ].map(esc).join(','));
+  }
+  return lines.join('\n');
+}
 
 function clientIp(req: IncomingMessage): string {
   const fwd = req.headers['x-forwarded-for'];
@@ -46,6 +76,7 @@ export function bootServices() {
   startSimulation();
   initAuth();
   initOwners();
+  initAlertLog();
 }
 
 function cors() {
@@ -200,6 +231,54 @@ export async function handleApi(
     const limit = Math.min(Number(search.get('limit')) || 200, 300);
     sendJson(res, 200, listApiLogs(limit));
     return true;
+  }
+
+  // ── Alert log (persistent audit) ──
+  if (method === 'GET' && path === '/alerts/log') {
+    sendJson(res, 200, listAllAlertLog());
+    return true;
+  }
+  {
+    const alm = path.match(/^\/vehicles\/([^/]+)\/alerts$/);
+    if (method === 'GET' && alm) {
+      sendJson(res, 200, listAlertLog(decodeURIComponent(alm[1])));
+      return true;
+    }
+    // Acknowledge (dismiss) an alert — any logged-in user.
+    const ackm = path.match(/^\/vehicles\/[^/]+\/alerts\/([^/]+)\/ack$/);
+    if (method === 'POST' && ackm) {
+      const entry = acknowledgeAlert(decodeURIComponent(ackm[1]), user.username);
+      sendJson(res, entry ? 200 : 404, entry ?? { error: 'not found' });
+      return true;
+    }
+  }
+
+  // ── CSV export of telemetry history ──
+  {
+    const csvm = path.match(/^\/vehicles\/([^/]+)\/export\.csv$/);
+    if (method === 'GET' && csvm) {
+      const id = decodeURIComponent(csvm[1]);
+      const rows = getRichHistory(id);
+      const range = search.get('range') ?? 'all';
+      const from = Number(search.get('from')) || 0;
+      const to = Number(search.get('to')) || Date.now();
+      const now = Date.now();
+      const windows: Record<string, number> = { '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000 };
+      const filtered = rows.filter(r => {
+        if (range === 'all') return true;
+        if (range === 'custom') return r.ts >= from && r.ts <= to;
+        const w = windows[range];
+        return w ? r.ts >= now - w : true;
+      });
+      const csv = buildCsv(id, filtered);
+      res.writeHead(200, {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${id}_telemetry_${range}.csv"`,
+        ...cors(),
+      });
+      res.end(csv);
+      return true;
+    }
   }
 
   // ── Admin: user management ──

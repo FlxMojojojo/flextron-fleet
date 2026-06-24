@@ -1,0 +1,15 @@
+{
+  "name": "Flextron Fleet Telemetry",
+  "short_name": "Flextron",
+  "description": "Live battery and GPS telemetry for the LoaderBike fleet.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1E1638",
+  "theme_color": "#1E1638",
+  "icons": [
+    { "src": "/brand/flextron-mark.png", "sizes": "534x604", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/flextron-mark.png", "sizes": "534x604", "type": "image/png", "purpose": "maskable" }
+  ]
+}
