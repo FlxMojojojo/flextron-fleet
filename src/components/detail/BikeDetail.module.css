@@ -469,6 +469,37 @@
   margin-bottom: var(--sp-4);
 }
 
+.pathInfo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: #6B7F9A;
+  margin-left: var(--sp-2);
+}
+.pathSwatch {
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--c-blue);
+  display: inline-block;
+}
+.resetPathBtn {
+  margin-left: auto;
+  font-family: var(--font-body);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--c-blue);
+  background: var(--c-status-charging-bg);
+  border: 1px solid #C7D9FF;
+  border-radius: var(--r-sm);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.resetPathBtn:hover { background: #DCE8FF; }
+
 /* Big interactive map */
 .bigMap {
   width: 100%;

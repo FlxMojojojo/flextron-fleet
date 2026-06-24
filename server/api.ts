@@ -11,7 +11,8 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getRichHistory, deleteVehicle, resetTrip,
+  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getRichHistory,
+  deleteVehicle, resetTrip, getPath, resetPath,
 } from './fleetStore';
 import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
 import {
@@ -359,6 +360,21 @@ export async function handleApi(
       if (user.role !== 'admin') { sendJson(res, 403, { error: 'admin only' }); return true; }
       const id = decodeURIComponent(rm[1]);
       const ok = resetTrip(id);
+      sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'not found' });
+      return true;
+    }
+  }
+
+  // ── GPS path / breadcrumb trail ──
+  {
+    const pm = path.match(/^\/vehicles\/([^/]+)\/path$/);
+    if (method === 'GET' && pm) {
+      sendJson(res, 200, getPath(decodeURIComponent(pm[1])));
+      return true;
+    }
+    const rp = path.match(/^\/vehicles\/([^/]+)\/reset-path$/);
+    if (method === 'POST' && rp) {
+      const ok = resetPath(decodeURIComponent(rp[1]));
       sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { error: 'not found' });
       return true;
     }

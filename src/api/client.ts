@@ -175,6 +175,13 @@ export function deleteVehicle(id: string): Promise<{ ok: true }> {
 export function resetTrip(id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/vehicles/${encodeURIComponent(id)}/reset-trip`, { method: 'POST' });
 }
+export interface PathPoint { ts: number; lat: number; lng: number; }
+export function getPath(id: string): Promise<PathPoint[]> {
+  return request<PathPoint[]>(`/api/vehicles/${encodeURIComponent(id)}/path`);
+}
+export function resetPath(id: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/vehicles/${encodeURIComponent(id)}/reset-path`, { method: 'POST' });
+}
 export function getVehicleHistory(
   id: string, metric: HistoryMetric, range: '10m' | '1h' | '6h' = '1h',
 ): Promise<TimeSeriesPoint[]> {

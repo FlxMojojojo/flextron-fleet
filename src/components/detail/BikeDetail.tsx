@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getVehicleLive, deleteVehicle, resetTrip } from '../../api/client';
+import { getVehicleLive, deleteVehicle, resetTrip, getPath, resetPath } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import type { VehicleState } from '../../types/telemetry';
 import { StatusChip } from '../shared/StatusChip';
@@ -39,6 +39,24 @@ export function BikeDetail() {
     refetchInterval: 3000,
     enabled: !!id,
   });
+
+  const { data: path = [] } = useQuery({
+    queryKey: ['path', id],
+    queryFn: () => getPath(id!),
+    refetchInterval: 5000,
+    enabled: !!id,
+  });
+
+  async function onResetPath() {
+    if (!id) return;
+    if (!confirm(`Clear the travel path for ${id}? Tracking continues from here.`)) return;
+    try {
+      await resetPath(id);
+      qc.invalidateQueries({ queryKey: ['path', id] });
+    } catch (e) {
+      alert(`Could not reset path: ${(e as Error).message}`);
+    }
+  }
 
   async function onDelete() {
     if (!id) return;
@@ -250,7 +268,17 @@ export function BikeDetail() {
 
       {/* Location */}
       <section className={s.card}>
-        <h2 className={s.cardTitle}>Location</h2>
+        <h2 className={s.cardTitle}>
+          Location
+          {path.length > 1 && (
+            <span className={s.pathInfo}>
+              <span className={s.pathSwatch} aria-hidden="true" /> Travel path · {path.length} points
+            </span>
+          )}
+          <button className={s.resetPathBtn} onClick={onResetPath} title="Clear the travel path">
+            Reset path
+          </button>
+        </h2>
 
         {/* Address (reverse-geocoded) */}
         <div className={s.addressRow}>
@@ -285,7 +313,7 @@ export function BikeDetail() {
           </div>
         </div>
 
-        <MiniMap gps={gps} className={s.bigMap} interactive />
+        <MiniMap gps={gps} className={s.bigMap} interactive path={path} />
       </section>
 
       {/* Battery faults (decoded from the BMS fault frame) + derived alerts */}

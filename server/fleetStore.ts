@@ -72,6 +72,8 @@ interface InternalRecord {
   gpsSpeedKmh: number;         // instantaneous speed derived from GPS
   lastGpsTs: number;           // ts of the last valid GPS fix
   faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
+  gpsPath?: { ts: number; lat: number; lng: number }[]; // breadcrumb trail
+  pathResetTs?: number;        // path points before this are hidden (manual reset)
   // Batch sync / cumulative-ACK tracking (ESP32 offline buffering)
   ackedSeq?: number;           // highest CONTIGUOUS committed sequence_id
   pendingSeqs?: number[];      // committed sequences above ackedSeq (gap buffer)
@@ -326,23 +328,34 @@ function isValidCoord(lat: number, lng: number): boolean {
     && !(lat === 0 && lng === 0);
 }
 
+const PATH_CAP = 3000;
+
 function applyGps(rec: InternalRecord, lat: number, lng: number, ts: number) {
   if (!isValidCoord(lat, lng)) return; // drop invalid / null-island fixes entirely
 
   const prev = rec.prevGps;
-  if (prev && Number.isFinite(prev.ts)) {
+  let record = false;
+  if (!prev || !Number.isFinite(prev.ts)) {
+    record = true; // first valid fix anchors the trail
+  } else {
     const segKm = haversineKm(prev.lat, prev.lng, lat, lng);
     const dtHr = Math.max((ts - prev.ts) / 3_600_000, 1e-9);
     const speed = segKm / dtHr;
-
     if (segKm >= MIN_MOVE_KM && speed <= MAX_SPEED_KMH) {
-      // Real movement: accumulate distance and report GPS speed.
+      // Real movement: accumulate distance, report GPS speed, extend the trail.
       rec.gpsDistanceKm += segKm;
       rec.gpsSpeedKmh = parseFloat(speed.toFixed(1));
+      record = true;
     } else {
       // Stationary jitter (too small) or glitch (too fast): no distance, speed 0.
       rec.gpsSpeedKmh = 0;
     }
+  }
+
+  if (record) {
+    if (!rec.gpsPath) rec.gpsPath = [];
+    rec.gpsPath.push({ ts, lat, lng });
+    if (rec.gpsPath.length > PATH_CAP) rec.gpsPath.shift();
   }
 
   rec.prevGps = { lat, lng, ts };
@@ -629,6 +642,24 @@ export function getVehicle(id: string): VehicleState | null {
   // Reverse-geocode only for single-vehicle reads (the detail page).
   vs.address = reverseGeocode(rec.gps.latitude, rec.gps.longitude);
   return vs;
+}
+
+/** GPS breadcrumb trail (points after the last manual reset), ordered by time. */
+export function getPath(id: string): { ts: number; lat: number; lng: number }[] {
+  const rec = store.get(id);
+  if (!rec?.gpsPath) return [];
+  const after = rec.pathResetTs ?? 0;
+  return rec.gpsPath.filter(p => p.ts >= after);
+}
+
+/** Clear the visible GPS trail (keeps tracking new movement from now). */
+export function resetPath(id: string): boolean {
+  const rec = store.get(id);
+  if (!rec) return false;
+  rec.pathResetTs = Date.now();
+  rec.gpsPath = [];
+  saveSnapshotNow();
+  return true;
 }
 
 /** Reset a vehicle's GPS-derived trip distance/speed without deleting it. */
