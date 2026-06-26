@@ -8,11 +8,10 @@ import { FleetMap } from './FleetMap';
 import type { VehicleState } from '../../types/telemetry';
 import s from './FleetOverview.module.css';
 
-function timeAgo(ts: number): string {
-  const sec = Math.floor((Date.now() - ts) / 1000);
-  if (sec < 5)  return 'just now';
-  if (sec < 60) return `${sec}s ago`;
-  return `${Math.floor(sec / 60)}m ago`;
+function lastUpdate(ts: number): string {
+  return new Date(ts).toLocaleString([], {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 export function FleetOverview() {
@@ -104,7 +103,7 @@ export function FleetOverview() {
                 </div>
                 <SocBar soc={v.can.soc} />
                 <span className={s.lastSeen}>
-                  {v.owner ? `${v.owner.name} · ${v.owner.vehicle_type} · ` : ''}{timeAgo(v.last_seen)}
+                  {v.owner ? `${v.owner.name} · ${v.owner.vehicle_type} · ` : ''}{lastUpdate(v.last_seen)}
                 </span>
               </button>
             </li>

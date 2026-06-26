@@ -13,7 +13,10 @@ import { ExportButton } from './ExportButton';
 import s from './BikeDetail.module.css';
 
 function fmt(ts: number) {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  return new Date(ts).toLocaleString([], {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
 }
 
 interface Alert { id: string; title: string; desc: string; }
