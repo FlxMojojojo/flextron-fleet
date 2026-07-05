@@ -111,6 +111,16 @@ const store = new Map<string, InternalRecord>();
 // A vehicle is considered offline if no telemetry arrives within this window.
 const OFFLINE_AFTER_MS = (Number(process.env.OFFLINE_AFTER_SEC) || 60) * 1000;
 
+/** Max/min of real (non-zero) cell voltages; null if there are none. */
+function cellExtremes(cells: number[]): { max: number; min: number } | null {
+  const real = cells.filter(x => x > 0);
+  if (real.length === 0) return null;
+  return {
+    max: parseFloat(Math.max(...real).toFixed(3)),
+    min: parseFloat(Math.min(...real).toFixed(3)),
+  };
+}
+
 function deriveStatus(can: CanTelemetry, forced: VehicleStatus | undefined, hasCriticalFault: boolean): VehicleStatus {
   if (forced === 'offline') return 'offline';
   if (hasCriticalFault || can.hv_critical_alert || can.battery_high_temp_telltale || (can.max_v - can.min_v) > 0.3) return 'alert';
@@ -119,18 +129,24 @@ function deriveStatus(can: CanTelemetry, forced: VehicleStatus | undefined, hasC
 }
 
 function toVehicleState(id: string, rec: InternalRecord): VehicleState {
-  const cellDelta = parseFloat((rec.can.max_v - rec.can.min_v).toFixed(3));
   const now = Date.now();
   const stale = now - rec.can.ts > OFFLINE_AFTER_MS;
   const faults = decodeFaults(rec.faultBytes);
   const hasCritical = faults.some(f => f.severity === 'CRITICAL');
   // Speed decays to 0 if no recent GPS fix (vehicle parked / GPS dropped).
   const gpsSpeed = (now - (rec.lastGpsTs ?? 0)) > GPS_STALE_MS ? 0 : (rec.gpsSpeedKmh ?? 0);
+
+  // Derive max/min (and delta) from the actual cells so a wrong device-reported
+  // MaxV/MinV can't mislead — the cell array is the source of truth.
+  const ext = cellExtremes(rec.can.cell_voltages);
+  const can = ext ? { ...rec.can, max_v: ext.max, min_v: ext.min } : rec.can;
+  const cellDelta = parseFloat((can.max_v - can.min_v).toFixed(3));
+
   return {
     vehicleno: id,
-    can: rec.can,
+    can,
     gps: rec.gps,
-    status: stale ? 'offline' : deriveStatus(rec.can, rec.forcedStatus, hasCritical),
+    status: stale ? 'offline' : deriveStatus(can, rec.forcedStatus, hasCritical),
     cell_delta: cellDelta,
     last_seen: rec.can.ts,
     hours_since_charge: rec.lastChargeTs == null ? null : parseFloat(((now - rec.lastChargeTs) / 3_600_000).toFixed(2)),
@@ -478,9 +494,10 @@ function composeCan(prev: CanTelemetry, c: Record<string, unknown>, id: string, 
   // Cell voltages: prefer the device-provided array (any pack size, 20S/24S);
   // fall back to synthesizing from min/max for legacy senders.
   const rawCells = firstDefined(c, ['cell_voltages', 'cellVoltages', 'CellVoltages']);
+  const hasCells = Array.isArray(rawCells) && rawCells.length > 0;
   let cells: number[];
-  if (Array.isArray(rawCells) && rawCells.length > 0) {
-    cells = rawCells.map(x => parseFloat(num(x).toFixed(3)));
+  if (hasCells) {
+    cells = (rawCells as unknown[]).map(x => parseFloat(num(x).toFixed(3)));
   } else {
     cells = prev.cell_voltages.length ? prev.cell_voltages : buildCells(3.2, 3.4);
   }
@@ -488,8 +505,17 @@ function composeCan(prev: CanTelemetry, c: Record<string, unknown>, id: string, 
   const provMax = firstDefined(c, ['max_v', 'MaxV']);
   const provMin = firstDefined(c, ['min_v', 'MinV']);
   const provSum = firstDefined(c, ['sum_voltage', 'SumVoltage']);
-  const max_v = provMax !== undefined ? num(provMax) : parseFloat(Math.max(...cells).toFixed(3));
-  const min_v = provMin !== undefined ? num(provMin) : parseFloat(Math.min(...cells).toFixed(3));
+
+  // When the device sends the full cell array, the array is the source of truth
+  // for max/min — the device's separate MaxV/MinV fields can be wrong (they only
+  // covered a subset of cells on some firmware). Ignore zero-padding slots.
+  const derived = cellExtremes(cells);
+  const max_v = hasCells && derived
+    ? derived.max
+    : (provMax !== undefined ? num(provMax) : parseFloat(Math.max(...cells).toFixed(3)));
+  const min_v = hasCells && derived
+    ? derived.min
+    : (provMin !== undefined ? num(provMin) : parseFloat(Math.min(...cells).toFixed(3)));
   const sum_voltage = provSum !== undefined ? num(provSum)
     : parseFloat(cells.reduce((a, b) => a + b, 0).toFixed(2));
 
