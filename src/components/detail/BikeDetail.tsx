@@ -254,6 +254,11 @@ export function BikeDetail() {
         <h2 className={s.cardTitle}>
           Cell Voltages ({can.cell_voltages.length} cells)
           {v.cell_delta > 0.1 && <span className={s.outlierBadge}>⚠ Imbalance detected</span>}
+          {![20, 24].includes(can.cell_voltages.length) && (
+            <span className={s.outlierBadge} title="Packs are 20S or 24S — the device is not reporting all cells">
+              ⚠ {can.cell_voltages.length}/20 cells reported
+            </span>
+          )}
         </h2>
         <CellHistory vehicleId={v.vehicleno} liveCells={can.cell_voltages} liveDelta={v.cell_delta} />
         <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', color: '#6B7F9A', marginTop: 'var(--sp-2)' }}>
