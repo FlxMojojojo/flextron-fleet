@@ -120,7 +120,8 @@ interface HistoryEntry {
 const store = new Map<string, InternalRecord>();
 
 // A vehicle is considered offline if no telemetry arrives within this window.
-const OFFLINE_AFTER_MS = (Number(process.env.OFFLINE_AFTER_SEC) || 60) * 1000;
+// Default: 5 minutes (a device is "online" as long as it pinged in the last 5 min).
+const OFFLINE_AFTER_MS = (Number(process.env.OFFLINE_AFTER_SEC) || 300) * 1000;
 
 /** Max/min of real (non-zero) cell voltages; null if there are none. */
 function cellExtremes(cells: number[]): { max: number; min: number } | null {
