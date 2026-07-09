@@ -22,13 +22,20 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
   const [range, setRange] = useState<TimeRange | null>(null);
   const meta = METRICS.find(m => m.key === active)!;
 
+  // Default view: the whole of today (midnight → now), live-updating. A custom
+  // range from the picker freezes to that window instead.
+  const startOfToday = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); })();
+  const effFrom = range ? range.from : startOfToday;
+  const effTo = range ? range.to : undefined;
+  const live = !range;
+
   const { data = [] } = useQuery({
-    queryKey: ['history', vehicleId, active, range?.from ?? 0, range?.to ?? 0],
-    queryFn: () => getVehicleHistory(vehicleId, active, '1h', range?.from, range?.to),
-    refetchInterval: range ? false : 3000,   // frozen when browsing history
+    queryKey: ['history', vehicleId, active, effFrom, effTo ?? 'live'],
+    queryFn: () => getVehicleHistory(vehicleId, active, '1h', effFrom, effTo),
+    refetchInterval: live ? 3000 : false,   // frozen when browsing a custom range
   });
 
-  const points = range ? data : data.slice(-40);
+  const points = data;
 
   // Axis scaling per metric:
   //  - Pack voltage → real operating range by pack type (20S 40–74 V, 24S 48–88 V)
