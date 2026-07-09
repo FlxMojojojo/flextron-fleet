@@ -265,19 +265,16 @@ export async function handleApi(
     const csvm = path.match(/^\/vehicles\/([^/]+)\/export\.csv$/);
     if (method === 'GET' && csvm) {
       const id = decodeURIComponent(csvm[1]);
-      const rows = getRichHistory(id);
       const range = search.get('range') ?? 'all';
-      const from = Number(search.get('from')) || 0;
-      const to = Number(search.get('to')) || Date.now();
       const now = Date.now();
       const windows: Record<string, number> = { '24h': 86_400_000, '7d': 604_800_000, '30d': 2_592_000_000 };
-      const filtered = rows.filter(r => {
-        if (range === 'all') return true;
-        if (range === 'custom') return r.ts >= from && r.ts <= to;
-        const w = windows[range];
-        return w ? r.ts >= now - w : true;
-      });
-      const csv = buildCsv(id, filtered);
+      let from: number | undefined;
+      let to: number | undefined;
+      if (range === 'custom') { from = Number(search.get('from')) || 0; to = Number(search.get('to')) || now; }
+      else if (windows[range]) { from = now - windows[range]; to = now; }
+      // 'all' → undefined bounds (whole archive, capped inside the query)
+      const rows = getRichHistory(id, from, to);
+      const csv = buildCsv(id, rows);
       res.writeHead(200, {
         'Content-Type': 'text/csv; charset=utf-8',
         'Content-Disposition': `attachment; filename="${id}_telemetry_${range}.csv"`,

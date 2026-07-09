@@ -18,6 +18,11 @@ import { reverseGeocode } from './geocode';
 import { syncAlerts, type ActiveAlertInput } from './alertLog';
 import { sendAlertEmail } from './mailer';
 import { getOwnerByVehicle } from './owners';
+import {
+  insertSample as dbInsert, backfill as dbBackfill,
+  queryHistory as dbHistory, querySnapshots as dbSnapshots, queryRich as dbRich,
+  deleteVehicleData as dbDelete,
+} from './db';
 
 /** Build the active-alert list for a vehicle, persist new ones to the audit
  *  log, and email the care team for each newly opened alert. */
@@ -302,6 +307,9 @@ export function startSimulation() {
   if (started) return;
   started = true;
   if (!loadSnapshot()) init();
+  // Seed the durable DB from whatever recent history is in the ring (idempotent),
+  // so charts aren't empty right after enabling persistent storage.
+  for (const [id, rec] of store) dbBackfill(id, rec.history);
   setInterval(saveSnapshotNow, 30_000); // periodic durable checkpoint
   setInterval(() => {
     const now = Date.now();
@@ -413,12 +421,15 @@ function snapshot(can: CanTelemetry, gps: GpsTelemetry, faultBytes: number[] | u
 }
 
 function pushHistory(rec: InternalRecord, ts: number, can: CanTelemetry = rec.can) {
-  rec.history.push(snapshot(can, rec.gps, rec.faultBytes, ts));
+  const snap = snapshot(can, rec.gps, rec.faultBytes, ts);
+  rec.history.push(snap);
   if (rec.history.length > HISTORY_CAP) rec.history.shift();
+  dbInsert(can.vehicleno, snap);   // durable long-term archive
 }
 
-export function getRichHistory(id: string): HistoryEntry[] {
-  return store.get(id)?.history ?? [];
+export function getRichHistory(id: string, from?: number, to?: number): HistoryEntry[] {
+  // Full rows from the durable archive (for CSV export over any date range).
+  return dbRich(id, from, to) as unknown as HistoryEntry[];
 }
 
 // ── Ingest (POST) ────────────────────────────────────────
@@ -633,7 +644,9 @@ export function ingestBatch(vehicleno: string, records: BatchRecord[]): { succes
 
     // Rich history point, using this record's own fault bytes + device time.
     const recFaults = Array.isArray(r.fault_bytes) ? r.fault_bytes.slice(0, 8).map(n => Number(n) || 0) : rec.faultBytes;
-    rec.history.push(snapshot(newCan, rec.gps, recFaults, devTs));
+    const snap = snapshot(newCan, rec.gps, recFaults, devTs);
+    rec.history.push(snap);
+    dbInsert(id, snap);
 
     pending.add(seq);
   }
@@ -665,7 +678,7 @@ function deviceTs(ts: number | undefined, fallback: number): number {
 /** Remove a vehicle and its history. It re-registers if the device posts again. */
 export function deleteVehicle(id: string): boolean {
   const existed = store.delete(id);
-  if (existed) saveSnapshotNow();
+  if (existed) { dbDelete(id); saveSnapshotNow(); }
   return existed;
 }
 
@@ -720,32 +733,13 @@ export function resetTrip(id: string): boolean {
   saveSnapshotNow();
   return true;
 }
+// Time-series history, cell snapshots, and CSV all read from the durable SQLite
+// archive (any date range, for years). The in-memory ring only serves the live
+// state and the recent GPS path.
 export function getHistory(id: string, metric: HistoryMetric, from?: number, to?: number) {
-  const rec = store.get(id);
-  if (!rec) return [];
-  let rows = rec.history;
-  if (from || to) {
-    const lo = from ?? 0;
-    const hi = to ?? Number.MAX_SAFE_INTEGER;
-    rows = rows.filter(h => h.ts >= lo && h.ts <= hi);
-  }
-  return rows.map(h => ({ ts: h.ts, value: h[metric as keyof typeof h] as number }));
+  return dbHistory(id, metric, from, to);
 }
 
-/** Timestamped cell-voltage snapshots for historic scrubbing (downsampled). */
 export function getSnapshots(id: string, from?: number, to?: number) {
-  const rec = store.get(id);
-  if (!rec) return [];
-  const lo = from ?? 0;
-  const hi = to ?? Number.MAX_SAFE_INTEGER;
-  const rows = rec.history.filter(h => h.ts >= lo && h.ts <= hi && Array.isArray(h.cell_voltages) && h.cell_voltages.length > 0);
-  // Downsample evenly to keep the payload small.
-  const MAX = 300;
-  const step = rows.length > MAX ? rows.length / MAX : 1;
-  const out: { ts: number; cell_voltages: number[]; soc: number; sum_voltage: number }[] = [];
-  for (let i = 0; i < rows.length; i += step) {
-    const h = rows[Math.floor(i)];
-    out.push({ ts: h.ts, cell_voltages: h.cell_voltages, soc: h.soc, sum_voltage: h.sum_voltage });
-  }
-  return out;
+  return dbSnapshots(id, from, to);
 }
