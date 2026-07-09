@@ -184,6 +184,18 @@ export function resetPath(id: string): Promise<{ ok: true }> {
 }
 export function getVehicleHistory(
   id: string, metric: HistoryMetric, range: '10m' | '1h' | '6h' = '1h',
+  from?: number, to?: number,
 ): Promise<TimeSeriesPoint[]> {
-  return request<TimeSeriesPoint[]>(`/api/vehicles/${encodeURIComponent(id)}/history?metric=${metric}&range=${range}`);
+  const params = new URLSearchParams({ metric, range });
+  if (from) params.set('from', String(from));
+  if (to) params.set('to', String(to));
+  return request<TimeSeriesPoint[]>(`/api/vehicles/${encodeURIComponent(id)}/history?${params}`);
+}
+
+export interface CellSnapshot { ts: number; cell_voltages: number[]; soc: number; sum_voltage: number; }
+export function getSnapshots(id: string, from?: number, to?: number): Promise<CellSnapshot[]> {
+  const params = new URLSearchParams();
+  if (from) params.set('from', String(from));
+  if (to) params.set('to', String(to));
+  return request<CellSnapshot[]>(`/api/vehicles/${encodeURIComponent(id)}/snapshots?${params}`);
 }

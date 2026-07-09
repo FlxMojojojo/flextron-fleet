@@ -12,7 +12,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getRichHistory,
-  deleteVehicle, resetTrip, getPath, resetPath,
+  getSnapshots, deleteVehicle, resetTrip, getPath, resetPath,
 } from './fleetStore';
 import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
 import {
@@ -383,12 +383,23 @@ export async function handleApi(
   // ── Telemetry reads (enriched with owner) ──
   if (method === 'GET') {
     if (path === '/vehicles') { sendJson(res, 200, getVehicles().map(withOwner)); return true; }
+
+    const sm = path.match(/^\/vehicles\/([^/]+)\/snapshots$/);
+    if (sm) {
+      const from = Number(search.get('from')) || undefined;
+      const to = Number(search.get('to')) || undefined;
+      sendJson(res, 200, getSnapshots(decodeURIComponent(sm[1]), from, to));
+      return true;
+    }
+
     const m = path.match(/^\/vehicles\/([^/]+)(\/history)?$/);
     if (m) {
       const id = decodeURIComponent(m[1]);
       if (m[2]) {
         const metric = (search.get('metric') ?? 'soc') as HistoryMetric;
-        sendJson(res, 200, getHistory(id, metric));
+        const from = Number(search.get('from')) || undefined;
+        const to = Number(search.get('to')) || undefined;
+        sendJson(res, 200, getHistory(id, metric, from, to));
         return true;
       }
       const v = getVehicle(id);

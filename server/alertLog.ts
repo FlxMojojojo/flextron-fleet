@@ -67,13 +67,15 @@ function scheduleSave() {
   }, 4000);
 }
 
-/** Open a log entry for any currently-active alert that doesn't already have one. */
-export function syncAlerts(vehicleno: string, deviceId: string, active: ActiveAlertInput[]): void {
+/** Open a log entry for any currently-active alert that doesn't already have
+ *  one. Returns the entries that were newly created by this call. */
+export function syncAlerts(vehicleno: string, deviceId: string, active: ActiveAlertInput[]): AlertLogEntry[] {
   const now = Date.now();
+  const created: AlertLogEntry[] = [];
   for (const a of active) {
     const hasOpen = log.some(e => e.vehicleno === vehicleno && e.code === a.code && e.status === 'active');
     if (!hasOpen) {
-      log.push({
+      const entry: AlertLogEntry = {
         id: randomBytes(8).toString('hex'),
         vehicleno,
         device_id: deviceId,
@@ -82,7 +84,9 @@ export function syncAlerts(vehicleno: string, deviceId: string, active: ActiveAl
         severity: a.severity,
         raised_at: now,
         status: 'active',
-      });
+      };
+      log.push(entry);
+      created.push(entry);
       // Bound history per vehicle (drop oldest acknowledged first).
       const mine = log.filter(e => e.vehicleno === vehicleno);
       if (mine.length > MAX_PER_VEHICLE) {
@@ -94,6 +98,7 @@ export function syncAlerts(vehicleno: string, deviceId: string, active: ActiveAl
       scheduleSave();
     }
   }
+  return created;
 }
 
 export function listAlertLog(vehicleno: string): AlertLogEntry[] {

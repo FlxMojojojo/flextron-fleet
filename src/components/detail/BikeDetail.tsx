@@ -5,7 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import type { VehicleState } from '../../types/telemetry';
 import { StatusChip } from '../shared/StatusChip';
 import { SocRing } from './SocRing';
-import { CellChart } from './CellChart';
+import { CellHistory } from './CellHistory';
 import { TelemetryChart } from './TelemetryChart';
 import { MiniMap } from './MiniMap';
 import { AlertLogCard } from './AlertLogCard';
@@ -255,7 +255,7 @@ export function BikeDetail() {
           Cell Voltages ({can.cell_voltages.length} cells)
           {v.cell_delta > 0.1 && <span className={s.outlierBadge}>⚠ Imbalance detected</span>}
         </h2>
-        <CellChart cells={can.cell_voltages} cellDelta={v.cell_delta} />
+        <CellHistory vehicleId={v.vehicleno} liveCells={can.cell_voltages} liveDelta={v.cell_delta} />
         <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', color: '#6B7F9A', marginTop: 'var(--sp-2)' }}>
           <span style={{ color: '#00A8E8' }}>■</span> Max cell &nbsp;
           <span style={{ color: v.cell_delta > 0.1 ? '#C2410C' : '#FACC15' }}>■</span> Min cell &nbsp;

@@ -1,0 +1,33 @@
+.empty {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: #94A3B8;
+  margin: 0 0 var(--sp-3);
+}
+
+.scrub {
+  margin-bottom: var(--sp-3);
+}
+.scrub input[type='range'] {
+  width: 100%;
+  accent-color: var(--c-blue);
+  cursor: pointer;
+}
+
+.scrubMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.ts {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--c-blue);
+}
+.snapInfo {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: #6B7F9A;
+}

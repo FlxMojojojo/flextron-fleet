@@ -16,15 +16,26 @@ import type {
 import { decodeFaults } from './faults';
 import { reverseGeocode } from './geocode';
 import { syncAlerts, type ActiveAlertInput } from './alertLog';
+import { sendAlertEmail } from './mailer';
+import { getOwnerByVehicle } from './owners';
 
-/** Build the active-alert list for a vehicle and persist new ones to the audit log. */
+/** Build the active-alert list for a vehicle, persist new ones to the audit
+ *  log, and email the care team for each newly opened alert. */
 function captureAlerts(id: string, rec: InternalRecord): void {
   const active: ActiveAlertInput[] = decodeFaults(rec.faultBytes)
     .map(f => ({ code: f.code, name: f.description, severity: f.severity }));
   if (rec.can.hv_critical_alert) active.push({ code: 'HV_CRITICAL', name: 'HV critical alert (BMS protection)', severity: 'CRITICAL' });
   if (rec.can.battery_high_temp_telltale) active.push({ code: 'PACK_HIGH_TEMP_TELLTALE', name: 'Pack high-temperature telltale', severity: 'CRITICAL' });
   if ((rec.can.max_v - rec.can.min_v) > 0.3) active.push({ code: 'CELL_IMBALANCE', name: 'Cell voltage imbalance', severity: 'CRITICAL' });
-  if (active.length) syncAlerts(id, id, active);
+  if (!active.length) return;
+
+  const created = syncAlerts(id, id, active);
+  if (created.length) {
+    const owner = getOwnerByVehicle(id);
+    for (const entry of created) {
+      sendAlertEmail({ entry, customerName: owner?.name ?? null, customerMobile: owner?.mobile ?? null });
+    }
+  }
 }
 
 // ── Persistence ──────────────────────────────────────────
@@ -708,8 +719,32 @@ export function resetTrip(id: string): boolean {
   saveSnapshotNow();
   return true;
 }
-export function getHistory(id: string, metric: HistoryMetric) {
+export function getHistory(id: string, metric: HistoryMetric, from?: number, to?: number) {
   const rec = store.get(id);
   if (!rec) return [];
-  return rec.history.map(h => ({ ts: h.ts, value: h[metric as keyof typeof h] as number }));
+  let rows = rec.history;
+  if (from || to) {
+    const lo = from ?? 0;
+    const hi = to ?? Number.MAX_SAFE_INTEGER;
+    rows = rows.filter(h => h.ts >= lo && h.ts <= hi);
+  }
+  return rows.map(h => ({ ts: h.ts, value: h[metric as keyof typeof h] as number }));
+}
+
+/** Timestamped cell-voltage snapshots for historic scrubbing (downsampled). */
+export function getSnapshots(id: string, from?: number, to?: number) {
+  const rec = store.get(id);
+  if (!rec) return [];
+  const lo = from ?? 0;
+  const hi = to ?? Number.MAX_SAFE_INTEGER;
+  const rows = rec.history.filter(h => h.ts >= lo && h.ts <= hi && Array.isArray(h.cell_voltages) && h.cell_voltages.length > 0);
+  // Downsample evenly to keep the payload small.
+  const MAX = 300;
+  const step = rows.length > MAX ? rows.length / MAX : 1;
+  const out: { ts: number; cell_voltages: number[]; soc: number; sum_voltage: number }[] = [];
+  for (let i = 0; i < rows.length; i += step) {
+    const h = rows[Math.floor(i)];
+    out.push({ ts: h.ts, cell_voltages: h.cell_voltages, soc: h.soc, sum_voltage: h.sum_voltage });
+  }
+  return out;
 }

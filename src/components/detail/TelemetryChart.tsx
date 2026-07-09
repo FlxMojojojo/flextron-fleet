@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getVehicleHistory } from '../../api/client';
 import type { HistoryMetric } from '../../types/telemetry';
+import { HistoryRange, type TimeRange } from './HistoryRange';
 import s from './BikeDetail.module.css';
 
 const METRICS: { key: HistoryMetric; label: string; unit: string; color: string }[] = [
@@ -18,15 +19,16 @@ function fmt(ts: number) {
 
 export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: string; cellCount?: number }) {
   const [active, setActive] = useState<HistoryMetric>('soc');
+  const [range, setRange] = useState<TimeRange | null>(null);
   const meta = METRICS.find(m => m.key === active)!;
 
   const { data = [] } = useQuery({
-    queryKey: ['history', vehicleId, active],
-    queryFn: () => getVehicleHistory(vehicleId, active, '1h'),
-    refetchInterval: 3000,
+    queryKey: ['history', vehicleId, active, range?.from ?? 0, range?.to ?? 0],
+    queryFn: () => getVehicleHistory(vehicleId, active, '1h', range?.from, range?.to),
+    refetchInterval: range ? false : 3000,   // frozen when browsing history
   });
 
-  const points = data.slice(-40);
+  const points = range ? data : data.slice(-40);
 
   // Pack voltage axis is bounded to the real operating range per pack type:
   //   20S → 40–74 V, 24S → 48–88 V. Other metrics auto-scale.
@@ -39,6 +41,12 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
 
   return (
     <div>
+      <HistoryRange range={range} onChange={setRange} />
+      {range && points.length === 0 && (
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', color: '#94A3B8' }}>
+          No data recorded in the selected window.
+        </p>
+      )}
       <div className={s.tabBar} role="tablist" aria-label="Telemetry metric">
         {METRICS.map(m => (
           <button
@@ -58,7 +66,9 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
           <CartesianGrid strokeDasharray="4 2" stroke="#EAF2FF" />
           <XAxis
             dataKey="ts"
-            tickFormatter={fmt}
+            tickFormatter={(ts: number) => range
+              ? new Date(ts).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+              : fmt(ts)}
             tick={{ fontFamily: 'JetBrains Mono', fontSize: 9, fill: '#6B7F9A' }}
             interval="preserveStartEnd"
           />
@@ -72,7 +82,9 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
           />
           <Tooltip
             contentStyle={{ fontFamily: 'JetBrains Mono', fontSize: 11, borderRadius: 6, border: '1px solid #D4E2F7' }}
-            labelFormatter={(label) => fmt(Number(label))}
+            labelFormatter={(label) => new Date(Number(label)).toLocaleString([], {
+              day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit',
+            })}
             formatter={(val) => [`${Number(val).toFixed(2)} ${meta.unit}`, meta.label]}
           />
           <Line
