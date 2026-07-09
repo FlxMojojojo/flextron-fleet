@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { getVehicleHistory } from '../../api/client';
 import type { HistoryMetric } from '../../types/telemetry';
 import { HistoryRange, type TimeRange } from './HistoryRange';
@@ -30,14 +30,24 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
 
   const points = range ? data : data.slice(-40);
 
-  // Pack voltage axis is bounded to the real operating range per pack type:
-  //   20S → 40–74 V, 24S → 48–88 V. Other metrics auto-scale.
+  // Axis scaling per metric:
+  //  - Pack voltage → real operating range by pack type (20S 40–74 V, 24S 48–88 V)
+  //  - Current → symmetric around 0 (charge is negative, discharge positive) so
+  //    both directions are always visible; min ±5 A so an idle line still reads
+  //  - Everything else → auto
   const is24S = cellCount >= 24;
-  const yDomain: [number | 'auto', number | 'auto'] =
-    active === 'sum_voltage' ? (is24S ? [48, 88] : [40, 74]) : ['auto', 'auto'];
-  const yTicks = active === 'sum_voltage'
-    ? (is24S ? [48, 58, 68, 78, 88] : [40, 48, 56, 64, 74])
-    : undefined;
+  let yDomain: [number | 'auto', number | 'auto'] = ['auto', 'auto'];
+  let yTicks: number[] | undefined;
+  if (active === 'sum_voltage') {
+    yDomain = is24S ? [48, 88] : [40, 74];
+    yTicks = is24S ? [48, 58, 68, 78, 88] : [40, 48, 56, 64, 74];
+  } else if (active === 'discharge_current') {
+    const nums = points.map(p => p.value).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    const maxAbs = Math.max(5, ...nums.map(v => Math.abs(v)));
+    const bound = Math.ceil(maxAbs / 5) * 5;
+    yDomain = [-bound, bound];
+    yTicks = [-bound, -bound / 2, 0, bound / 2, bound];
+  }
 
   return (
     <div>
@@ -87,6 +97,7 @@ export function TelemetryChart({ vehicleId, cellCount = 20 }: { vehicleId: strin
             })}
             formatter={(val) => [`${Number(val).toFixed(2)} ${meta.unit}`, meta.label]}
           />
+          {active === 'discharge_current' && <ReferenceLine y={0} stroke="#B7C6DE" strokeDasharray="3 3" />}
           <Line
             type="monotone"
             dataKey="value"
