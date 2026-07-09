@@ -22,9 +22,22 @@ export function CellHistory({ vehicleId, liveCells, liveDelta }:
 
   const snap = range && snaps.length ? snaps[Math.min(idx, snaps.length - 1)] : null;
   const cells = snap ? snap.cell_voltages : liveCells;
-  const delta = snap
-    ? (() => { const real = snap.cell_voltages.filter(x => x > 0); return real.length ? parseFloat((Math.max(...real) - Math.min(...real)).toFixed(3)) : 0; })()
-    : liveDelta;
+
+  // Per-cell stats for the currently-shown sample: deviation + which cell is
+  // weakest (min) and highest (max), so an outlier cell is easy to spot.
+  const stats = (() => {
+    const real = cells.map((v, i) => ({ v, i })).filter(c => c.v > 0);
+    if (real.length === 0) return null;
+    let mn = real[0], mx = real[0];
+    for (const c of real) { if (c.v < mn.v) mn = c; if (c.v > mx.v) mx = c; }
+    return {
+      delta: parseFloat((mx.v - mn.v).toFixed(3)),
+      minCell: mn.i + 1, minV: mn.v,
+      maxCell: mx.i + 1, maxV: mx.v,
+    };
+  })();
+  const delta = snap ? (stats?.delta ?? 0) : liveDelta;
+  const cLabel = (n: number) => `C${String(n).padStart(2, '0')}`;
 
   return (
     <div>
@@ -53,6 +66,20 @@ export function CellHistory({ vehicleId, liveCells, liveDelta }:
             </div>
           </div>
         )
+      )}
+
+      {stats && (
+        <div className={s.stats}>
+          <span className={`${s.stat} ${stats.delta > 0.1 ? s.statWarn : ''}`}>
+            Cell Δ <strong>{stats.delta.toFixed(3)} V</strong>
+          </span>
+          <span className={s.stat}>
+            <span className={s.dotMin} aria-hidden="true" /> Weakest <strong>{cLabel(stats.minCell)}</strong> ({stats.minV.toFixed(3)} V)
+          </span>
+          <span className={s.stat}>
+            <span className={s.dotMax} aria-hidden="true" /> Highest <strong>{cLabel(stats.maxCell)}</strong> ({stats.maxV.toFixed(3)} V)
+          </span>
+        </div>
       )}
 
       <CellChart cells={cells} cellDelta={delta} />

@@ -31,3 +31,28 @@
   font-size: var(--text-xs);
   color: #6B7F9A;
 }
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: center;
+  margin: 0 0 var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-surf-2);
+  border: 1px solid var(--c-hairline);
+  border-radius: var(--r-md);
+}
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: #475569;
+}
+.stat strong { font-family: var(--font-mono); color: var(--c-ink); font-weight: 600; }
+.statWarn strong { color: var(--c-warn); }
+.dotMin { width: 10px; height: 10px; border-radius: 2px; background: #C2410C; display: inline-block; }
+.dotMax { width: 10px; height: 10px; border-radius: 2px; background: #00A8E8; display: inline-block; }
+
