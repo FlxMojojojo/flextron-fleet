@@ -20,7 +20,7 @@ import { sendAlertEmail } from './mailer';
 import { getOwnerByVehicle } from './owners';
 import {
   insertSample as dbInsert, backfill as dbBackfill,
-  queryHistory as dbHistory, querySnapshots as dbSnapshots, queryRich as dbRich,
+  queryHistory as dbHistory, querySeries as dbSeries, querySnapshots as dbSnapshots, queryRich as dbRich,
   deleteVehicleData as dbDelete,
 } from './db';
 
@@ -738,6 +738,10 @@ export function resetTrip(id: string): boolean {
 // state and the recent GPS path.
 export function getHistory(id: string, metric: HistoryMetric, from?: number, to?: number) {
   return dbHistory(id, metric, from, to);
+}
+
+export function getSeries(id: string, metrics: HistoryMetric[], from?: number, to?: number) {
+  return dbSeries(id, metrics, from, to);
 }
 
 export function getSnapshots(id: string, from?: number, to?: number) {

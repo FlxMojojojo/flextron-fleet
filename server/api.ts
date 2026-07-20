@@ -11,7 +11,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
-  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getRichHistory,
+  startSimulation, ingest, ingestBatch, getVehicles, getVehicle, getHistory, getSeries, getRichHistory,
   getSnapshots, deleteVehicle, resetTrip, getPath, resetPath,
 } from './fleetStore';
 import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
@@ -380,6 +380,15 @@ export async function handleApi(
   // ── Telemetry reads (enriched with owner) ──
   if (method === 'GET') {
     if (path === '/vehicles') { sendJson(res, 200, getVehicles().map(withOwner)); return true; }
+
+    const sem = path.match(/^\/vehicles\/([^/]+)\/series$/);
+    if (sem) {
+      const metrics = (search.get('metrics') ?? 'soc').split(',').filter(Boolean) as HistoryMetric[];
+      const from = Number(search.get('from')) || undefined;
+      const to = Number(search.get('to')) || undefined;
+      sendJson(res, 200, getSeries(decodeURIComponent(sem[1]), metrics, from, to));
+      return true;
+    }
 
     const sm = path.match(/^\/vehicles\/([^/]+)\/snapshots$/);
     if (sm) {

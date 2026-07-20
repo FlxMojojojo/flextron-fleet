@@ -123,6 +123,17 @@ export function queryHistory(vehicleno: string, metric: HistoryMetric, from?: nu
   return downsample(rows, 1200);
 }
 
+/** Multiple metrics aligned by timestamp (for overlay/comparison charts). */
+export function querySeries(vehicleno: string, metrics: HistoryMetric[], from?: number, to?: number): Record<string, number>[] {
+  const valid = metrics.filter(m => METRIC_COL[m]);
+  if (valid.length === 0) return [];
+  const cols = valid.map(m => `${METRIC_COL[m]} AS ${m}`).join(', ');
+  const rows = db.prepare(
+    `SELECT ts, ${cols} FROM telemetry WHERE vehicleno=? AND ts>=? AND ts<=? ORDER BY ts`,
+  ).all(vehicleno, from ?? 0, to ?? Number.MAX_SAFE_INTEGER) as Record<string, number>[];
+  return downsample(rows, 1500);
+}
+
 export function querySnapshots(vehicleno: string, from?: number, to?: number): { ts: number; cell_voltages: number[]; soc: number; sum_voltage: number }[] {
   const rows = db.prepare(
     `SELECT ts, cell_voltages, soc, sum_voltage FROM telemetry

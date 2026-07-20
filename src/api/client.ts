@@ -192,6 +192,14 @@ export function getVehicleHistory(
   return request<TimeSeriesPoint[]>(`/api/vehicles/${encodeURIComponent(id)}/history?${params}`);
 }
 
+export type SeriesRow = { ts: number } & Partial<Record<HistoryMetric, number>>;
+export function getSeries(id: string, metrics: HistoryMetric[], from?: number, to?: number): Promise<SeriesRow[]> {
+  const params = new URLSearchParams({ metrics: metrics.join(',') });
+  if (from) params.set('from', String(from));
+  if (to) params.set('to', String(to));
+  return request<SeriesRow[]>(`/api/vehicles/${encodeURIComponent(id)}/series?${params}`);
+}
+
 export interface CellSnapshot { ts: number; cell_voltages: number[]; soc: number; sum_voltage: number; }
 export function getSnapshots(id: string, from?: number, to?: number): Promise<CellSnapshot[]> {
   const params = new URLSearchParams();
