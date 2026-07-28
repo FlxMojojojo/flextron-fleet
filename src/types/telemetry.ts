@@ -73,6 +73,8 @@ export interface VehicleState {
   owner?: Owner | null;              // mapped owner, attached by the API layer
   faults: Fault[];                   // decoded active BMS faults (from fault_bytes)
   fault_bytes?: number[];            // raw 8-byte fault frame as received
+  firmware_version?: string;         // device firmware version
+  imei?: string;                     // device modem IMEI
 }
 
 export interface TimeSeriesPoint {

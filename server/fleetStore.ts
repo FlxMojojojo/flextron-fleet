@@ -88,6 +88,8 @@ interface InternalRecord {
   gpsSpeedKmh: number;         // instantaneous speed derived from GPS
   lastGpsTs: number;           // ts of the last valid GPS fix
   faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
+  firmwareVersion?: string;    // device firmware version
+  imei?: string;               // device modem IMEI
   gpsPath?: { ts: number; lat: number; lng: number }[]; // breadcrumb trail
   pathResetTs?: number;        // path points before this are hidden (manual reset)
   // Batch sync / cumulative-ACK tracking (ESP32 offline buffering)
@@ -171,6 +173,8 @@ function toVehicleState(id: string, rec: InternalRecord): VehicleState {
     gps_speed_kmh: parseFloat(gpsSpeed.toFixed(1)),
     faults,
     fault_bytes: rec.faultBytes,
+    firmware_version: rec.firmwareVersion,
+    imei: rec.imei,
   };
 }
 
@@ -434,7 +438,7 @@ export function getRichHistory(id: string, from?: number, to?: number): HistoryE
 
 // ── Ingest (POST) ────────────────────────────────────────
 type IngestPayload =
-  | { vehicleno: string; type: 'can'; can: Record<string, unknown>; fault_bytes?: number[]; alarm_levels_raw?: number[] }
+  | { vehicleno: string; type: 'can'; can: Record<string, unknown>; fault_bytes?: number[]; alarm_levels_raw?: number[]; firmware_version?: string; imei?: string }
   | { vehicleno: string; type: 'gps'; data: { latitude: number; longitude: number } };
 
 function num(v: unknown, fallback = 0): number {
@@ -500,6 +504,8 @@ export function ingest(payload: IngestPayload): { ok: true; vehicleno: string } 
     if (Array.isArray(payload.fault_bytes)) {
       rec.faultBytes = payload.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
     }
+    if (typeof payload.firmware_version === 'string') rec.firmwareVersion = payload.firmware_version;
+    if (typeof payload.imei === 'string') rec.imei = payload.imei;
     rec.forcedStatus = undefined; // real data overrides any seeded forcing
     if (rec.can.charging_status === 1) rec.lastChargeTs = now;
     captureAlerts(id, rec);
@@ -633,6 +639,8 @@ export function ingestBatch(vehicleno: string, records: BatchRecord[]): { succes
       rec.forcedStatus = undefined;
       rec.lastAppliedSeq = seq;
       if (Array.isArray(r.fault_bytes)) rec.faultBytes = r.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
+      if (typeof r.firmware_version === 'string') rec.firmwareVersion = r.firmware_version;
+      if (typeof r.imei === 'string') rec.imei = r.imei;
       if (newCan.charging_status === 1) rec.lastChargeTs = now;
     }
     // GPS first (so the history snapshot captures this record's position);

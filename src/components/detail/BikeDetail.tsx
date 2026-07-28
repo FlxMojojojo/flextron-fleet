@@ -117,6 +117,12 @@ export function BikeDetail() {
             {v.owner ? <>Owner: <strong>{v.owner.name}</strong> · {v.owner.vehicle_type} · </> : null}
             Last update {fmt(v.last_seen)}
           </div>
+          {(v.firmware_version || v.imei) && (
+            <div className={s.deviceMeta}>
+              {v.firmware_version && <span>FW <strong>v{v.firmware_version}</strong></span>}
+              {v.imei && <span>IMEI <strong>{v.imei}</strong></span>}
+            </div>
+          )}
         </div>
         <StatusChip status={v.status} />
         <ExportButton vehicleId={v.vehicleno} />

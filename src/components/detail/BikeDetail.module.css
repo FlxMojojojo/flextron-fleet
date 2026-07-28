@@ -47,6 +47,17 @@
 
 .headerInfo { flex: 1; }
 
+.deviceMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1) var(--sp-4);
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: #94A3B8;
+}
+.deviceMeta strong { color: #6B7F9A; font-weight: 600; }
+
 .deleteBtn {
   display: inline-flex;
   align-items: center;
