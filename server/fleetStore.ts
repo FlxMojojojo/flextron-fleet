@@ -639,8 +639,9 @@ export function ingestBatch(vehicleno: string, records: BatchRecord[]): { succes
       rec.forcedStatus = undefined;
       rec.lastAppliedSeq = seq;
       if (Array.isArray(r.fault_bytes)) rec.faultBytes = r.fault_bytes.slice(0, 8).map(n => Number(n) || 0);
-      if (typeof r.firmware_version === 'string') rec.firmwareVersion = r.firmware_version;
-      if (typeof r.imei === 'string') rec.imei = r.imei;
+      const rr = r as Record<string, unknown>;
+      if (typeof rr.firmware_version === 'string') rec.firmwareVersion = rr.firmware_version;
+      if (typeof rr.imei === 'string') rec.imei = rr.imei;
       if (newCan.charging_status === 1) rec.lastChargeTs = now;
     }
     // GPS first (so the history snapshot captures this record's position);
