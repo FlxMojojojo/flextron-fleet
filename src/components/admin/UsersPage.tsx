@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listUsers, createUser, deleteUser, type Role } from '../../api/client';
+import { listUsers, createUser, deleteUser, setUserPassword, type Role } from '../../api/client';
 import { useAuth } from '../../auth/AuthContext';
 import s from './UsersPage.module.css';
 
@@ -34,6 +34,20 @@ export function UsersPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
     onError: (e) => setMsg({ ok: false, text: (e as Error).message }),
   });
+
+  const resetPwM = useMutation({
+    mutationFn: ({ id, pw }: { id: string; pw: string }) => setUserPassword(id, pw),
+    onSuccess: () => setMsg({ ok: true, text: 'Password updated.' }),
+    onError: (e) => setMsg({ ok: false, text: (e as Error).message }),
+  });
+
+  function onResetPassword(id: string, username: string) {
+    const pw = window.prompt(`Set a new password for "${username}" (min 6 characters):`);
+    if (pw == null) return;
+    if (pw.length < 6) { setMsg({ ok: false, text: 'Password must be at least 6 characters.' }); return; }
+    setMsg(null);
+    resetPwM.mutate({ id, pw });
+  }
 
   function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -69,16 +83,26 @@ export function UsersPage() {
                   </td>
                   <td>{fmtDate(u.createdAt)}</td>
                   <td style={{ textAlign: 'right' }}>
-                    <button
-                      className={s.deleteBtn}
-                      onClick={() => {
-                        if (confirm(`Delete user "${u.username}"?`)) deleteM.mutate(u.id);
-                      }}
-                      disabled={u.id === me?.id}
-                      title={u.id === me?.id ? 'You cannot delete your own account' : 'Delete user'}
-                    >
-                      Delete
-                    </button>
+                    <div className={s.actions}>
+                      <button
+                        className={s.resetBtn}
+                        onClick={() => onResetPassword(u.id, u.username)}
+                        disabled={resetPwM.isPending}
+                        title="Set a new password for this user"
+                      >
+                        Reset password
+                      </button>
+                      <button
+                        className={s.deleteBtn}
+                        onClick={() => {
+                          if (confirm(`Delete user "${u.username}"?`)) deleteM.mutate(u.id);
+                        }}
+                        disabled={u.id === me?.id}
+                        title={u.id === me?.id ? 'You cannot delete your own account' : 'Delete user'}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -120,6 +120,17 @@ export function createUser(username: string, password: string, role: Role): Publ
   return toPublic(user);
 }
 
+export function setPassword(id: string, newPassword: string): void {
+  const u = users.get(id);
+  if (!u) throw new Error('user not found');
+  if (!newPassword || newPassword.length < 6) throw new Error('password must be at least 6 characters');
+  const salt = randomBytes(16).toString('hex');
+  u.salt = salt;
+  u.hash = hashPassword(newPassword, salt);
+  users.set(id, u);
+  persist();
+}
+
 export function deleteUser(id: string): void {
   const u = users.get(id);
   if (!u) throw new Error('user not found');

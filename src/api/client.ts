@@ -81,6 +81,11 @@ export function createUser(username: string, password: string, role: Role): Prom
 export function deleteUser(id: string): Promise<{ ok: true }> {
   return request<{ ok: true }>(`/api/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
+export function setUserPassword(id: string, password: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>(`/api/users/${encodeURIComponent(id)}/password`, {
+    method: 'POST', body: JSON.stringify({ password }),
+  });
+}
 
 // ── Owners (bike customers) ──
 export interface OwnerInput {

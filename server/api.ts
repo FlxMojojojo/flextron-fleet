@@ -17,7 +17,7 @@ import {
 import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
-  listUsers, createUser, deleteUser, type User, type Role,
+  listUsers, createUser, deleteUser, setPassword, type User, type Role,
 } from './auth';
 import {
   initOwners, listOwners, createOwner, updateOwner, deleteOwner, getOwnerByVehicle,
@@ -308,6 +308,18 @@ export async function handleApi(
       if (id === user.id) { sendJson(res, 400, { error: 'you cannot delete your own account' }); return true; }
       try { deleteUser(id); sendJson(res, 200, { ok: true }); }
       catch (e) { sendJson(res, 400, { error: (e as Error).message }); }
+      return true;
+    }
+
+    const pw = path.match(/^\/users\/([^/]+)\/password$/);
+    if (method === 'POST' && pw) {
+      try {
+        const b = await readBody(req) as { password?: string };
+        setPassword(decodeURIComponent(pw[1]), b.password ?? '');
+        sendJson(res, 200, { ok: true });
+      } catch (e) {
+        sendJson(res, 400, { error: (e as Error).message });
+      }
       return true;
     }
   }
