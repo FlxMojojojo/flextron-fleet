@@ -20,6 +20,7 @@ export type Role = 'admin' | 'user';
 export interface User {
   id: string;
   username: string;
+  email?: string;
   role: Role;
   salt: string;
   hash: string;
@@ -29,6 +30,7 @@ export interface User {
 export interface PublicUser {
   id: string;
   username: string;
+  email?: string;
   role: Role;
   createdAt: number;
 }
@@ -48,7 +50,7 @@ function hashPassword(password: string, salt: string): string {
 }
 
 export function toPublic(u: User): PublicUser {
-  return { id: u.id, username: u.username, role: u.role, createdAt: u.createdAt };
+  return { id: u.id, username: u.username, email: u.email, role: u.role, createdAt: u.createdAt };
 }
 
 function persist() {
@@ -101,15 +103,24 @@ export function findByUsername(username: string): User | undefined {
   return [...users.values()].find(u => u.username.toLowerCase() === username.toLowerCase());
 }
 
-export function createUser(username: string, password: string, role: Role): PublicUser {
+/** Look a user up by username OR email (for password reset). */
+export function findByIdentifier(identifier: string): User | undefined {
+  const q = identifier.trim().toLowerCase();
+  return [...users.values()].find(u => u.username.toLowerCase() === q || (u.email ?? '').toLowerCase() === q);
+}
+
+export function createUser(username: string, password: string, role: Role, email?: string): PublicUser {
   username = username.trim();
+  email = email?.trim() || undefined;
   if (!username || !password) throw new Error('username and password are required');
   if (password.length < 6) throw new Error('password must be at least 6 characters');
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error('enter a valid email address');
   if (findByUsername(username)) throw new Error('username already exists');
   const salt = randomBytes(16).toString('hex');
   const user: User = {
     id: randomBytes(8).toString('hex'),
     username,
+    email,
     role,
     salt,
     hash: hashPassword(password, salt),
@@ -118,6 +129,17 @@ export function createUser(username: string, password: string, role: Role): Publ
   users.set(user.id, user);
   persist();
   return toPublic(user);
+}
+
+export function setEmail(id: string, email: string): PublicUser {
+  const u = users.get(id);
+  if (!u) throw new Error('user not found');
+  const e = email.trim();
+  if (e && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) throw new Error('enter a valid email address');
+  u.email = e || undefined;
+  users.set(id, u);
+  persist();
+  return toPublic(u);
 }
 
 export function setPassword(id: string, newPassword: string): void {
@@ -129,6 +151,35 @@ export function setPassword(id: string, newPassword: string): void {
   u.hash = hashPassword(newPassword, salt);
   users.set(id, u);
   persist();
+}
+
+// ── Password reset tokens (signed, single-use, 1-hour expiry) ──
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+/** A reset token is bound to the user's current password hash, so it's
+ *  invalidated the moment the password changes (single-use in practice). */
+export function makeResetToken(u: User): string {
+  const payload = Buffer.from(JSON.stringify({
+    uid: u.id, exp: Date.now() + RESET_TTL_MS, fp: u.hash.slice(0, 12),
+  })).toString('base64url');
+  const sig = createHmac('sha256', secret).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+export function resetWithToken(token: string, newPassword: string): void {
+  if (!newPassword || newPassword.length < 6) throw new Error('password must be at least 6 characters');
+  const [payload, sig] = (token ?? '').split('.');
+  if (!payload || !sig) throw new Error('invalid or expired reset link');
+  const expected = createHmac('sha256', secret).update(payload).digest('base64url');
+  const a = Buffer.from(sig), b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error('invalid or expired reset link');
+  let data: { uid: string; exp: number; fp: string };
+  try { data = JSON.parse(Buffer.from(payload, 'base64url').toString()); }
+  catch { throw new Error('invalid or expired reset link'); }
+  if (Date.now() > data.exp) throw new Error('this reset link has expired');
+  const u = users.get(data.uid);
+  if (!u || u.hash.slice(0, 12) !== data.fp) throw new Error('this reset link is no longer valid');
+  setPassword(u.id, newPassword);
 }
 
 export function deleteUser(id: string): void {

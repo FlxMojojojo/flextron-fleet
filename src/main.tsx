@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppShell } from './components/shell/AppShell';
 import { FleetOverview } from './components/overview/FleetOverview';
 import { LoginPage } from './components/auth/LoginPage';
+import { ResetPasswordPage } from './components/auth/ResetPasswordPage';
 import { BrandMark } from './components/shared/BrandMark';
 
 const BikeDetail = lazy(() => import('./components/detail/BikeDetail').then(m => ({ default: m.BikeDetail })));
@@ -56,6 +57,7 @@ createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/reset" element={<ResetPasswordPage />} />
             <Route element={<RequireAuth><AppShell /></RequireAuth>}>
               <Route index element={<FleetOverview />} />
               <Route path="bike/:id" element={lazyRoute(<BikeDetail />)} />

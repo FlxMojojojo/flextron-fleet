@@ -102,3 +102,25 @@
   color: #94A3B8;
   text-align: center;
 }
+
+.info {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--c-good);
+  background: var(--c-status-ok-bg);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+}
+
+.linkBtn {
+  background: none;
+  border: none;
+  color: var(--c-blue);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px;
+  align-self: center;
+}
+.linkBtn:hover { text-decoration: underline; }

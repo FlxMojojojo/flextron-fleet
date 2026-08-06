@@ -11,7 +11,7 @@ export const BASE_URL: string = import.meta.env.VITE_API_BASE_URL ?? '';
 const TOKEN_KEY = 'flextron_token';
 
 export type Role = 'admin' | 'user';
-export interface AuthUser { id: string; username: string; role: Role; createdAt: number; }
+export interface AuthUser { id: string; username: string; email?: string; role: Role; createdAt: number; }
 
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -67,15 +67,30 @@ export async function getMe(): Promise<AuthUser> {
   const { user } = await request<{ user: AuthUser }>('/api/auth/me');
   return user;
 }
+export function forgotPassword(identifier: string): Promise<{ ok: true; message?: string }> {
+  return request<{ ok: true; message?: string }>('/api/auth/forgot', {
+    method: 'POST', body: JSON.stringify({ identifier }),
+  });
+}
+export function resetPassword(token: string, password: string): Promise<{ ok: true }> {
+  return request<{ ok: true }>('/api/auth/reset', {
+    method: 'POST', body: JSON.stringify({ token, password }),
+  });
+}
 
 // ── Admin: users ──
 export function listUsers(): Promise<AuthUser[]> {
   return request<AuthUser[]>('/api/users');
 }
-export function createUser(username: string, password: string, role: Role): Promise<AuthUser> {
+export function createUser(username: string, password: string, role: Role, email?: string): Promise<AuthUser> {
   return request<AuthUser>('/api/users', {
     method: 'POST',
-    body: JSON.stringify({ username, password, role }),
+    body: JSON.stringify({ username, password, role, email }),
+  });
+}
+export function setUserEmail(id: string, email: string): Promise<AuthUser> {
+  return request<AuthUser>(`/api/users/${encodeURIComponent(id)}/email`, {
+    method: 'POST', body: JSON.stringify({ email }),
   });
 }
 export function deleteUser(id: string): Promise<{ ok: true }> {

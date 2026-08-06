@@ -60,6 +60,19 @@
 
 .username { font-weight: 600; }
 
+.email { }
+.emailLink {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font-family: var(--font-body); font-size: var(--text-sm); color: var(--c-ink);
+}
+.emailLink:hover { color: var(--c-blue); text-decoration: underline; }
+.emailAdd {
+  background: none; border: 1px dashed var(--c-hairline); border-radius: var(--r-sm);
+  padding: 2px 8px; cursor: pointer;
+  font-family: var(--font-body); font-size: var(--text-xs); color: #94A3B8;
+}
+.emailAdd:hover { color: var(--c-blue); border-color: #C7D9FF; }
+
 .roleBadge {
   display: inline-block;
   font-family: var(--font-body);

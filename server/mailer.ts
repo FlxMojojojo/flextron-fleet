@@ -117,3 +117,36 @@ export function sendAlertEmail(ctx: AlertEmailContext): void {
     .then(() => console.log(`[mailer] alert email sent: ${entry.vehicleno} ${entry.code}`))
     .catch(err => console.warn('[mailer] send failed:', (err as Error).message));
 }
+
+/** Send a password-reset link to a user's email. Returns false if SMTP is off. */
+export function sendResetEmail(email: string, username: string, resetUrl: string): boolean {
+  const t = getTransport();
+  if (!t) { console.warn('[mailer] SMTP not configured — cannot send reset email to', email); return false; }
+  const subject = 'Flextron Fleet — password reset';
+  const text = [
+    `Hi ${username},`,
+    ``,
+    `A password reset was requested for your Flextron Fleet Telemetry account.`,
+    `Open this link to set a new password (valid for 1 hour):`,
+    ``,
+    resetUrl,
+    ``,
+    `If you didn't request this, you can ignore this email — your password won't change.`,
+    ``,
+    `— Flextron Fleet Telemetry`,
+  ].join('\n');
+  const html = `
+  <div style="font-family:Arial,sans-serif;max-width:520px">
+    <div style="background:#1E1638;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0"><strong>Flextron Fleet Telemetry</strong></div>
+    <div style="border:1px solid #e2e2e2;border-top:none;padding:18px;border-radius:0 0 8px 8px">
+      <p>Hi <strong>${username}</strong>,</p>
+      <p>A password reset was requested for your account. Click below to set a new password (link valid for 1 hour):</p>
+      <p><a href="${resetUrl}" style="background:#1E5BFF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;display:inline-block">Reset my password</a></p>
+      <p style="color:#666;font-size:13px">If you didn't request this, ignore this email — your password won't change.</p>
+    </div>
+  </div>`;
+  t.sendMail({ from: FROM, to: email, subject, text, html })
+    .then(() => console.log(`[mailer] reset email sent to ${email}`))
+    .catch(err => console.warn('[mailer] reset send failed:', (err as Error).message));
+  return true;
+}

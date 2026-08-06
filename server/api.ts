@@ -17,8 +17,10 @@ import {
 import { initAlertLog, listAlertLog, listAllAlertLog, acknowledgeAlert } from './alertLog';
 import {
   initAuth, verifyCredentials, signToken, verifyToken, toPublic,
-  listUsers, createUser, deleteUser, setPassword, type User, type Role,
+  listUsers, createUser, deleteUser, setPassword, setEmail,
+  findByIdentifier, makeResetToken, resetWithToken, type User, type Role,
 } from './auth';
+import { sendResetEmail } from './mailer';
 import {
   initOwners, listOwners, createOwner, updateOwner, deleteOwner, getOwnerByVehicle,
 } from './owners';
@@ -171,6 +173,36 @@ export async function handleApi(
     return true;
   }
 
+  // ── Forgot password: email a reset link (public; never reveals account existence) ──
+  if (method === 'POST' && path === '/auth/forgot') {
+    try {
+      const body = await readBody(req) as { identifier?: string };
+      const u = findByIdentifier(body.identifier ?? '');
+      if (u?.email) {
+        const origin = req.headers['origin'] as string || 'https://track.ft.energy';
+        const url = `${origin}/reset?token=${encodeURIComponent(makeResetToken(u))}`;
+        sendResetEmail(u.email, u.username, url);
+      }
+      // Always the same response, whether or not the account/email exists.
+      sendJson(res, 200, { ok: true, message: 'If an account with that email or username exists, a reset link has been sent.' });
+    } catch {
+      sendJson(res, 200, { ok: true });
+    }
+    return true;
+  }
+
+  // ── Reset password using an emailed token (public) ──
+  if (method === 'POST' && path === '/auth/reset') {
+    try {
+      const body = await readBody(req) as { token?: string; password?: string };
+      resetWithToken(body.token ?? '', body.password ?? '');
+      sendJson(res, 200, { ok: true });
+    } catch (e) {
+      sendJson(res, 400, { error: (e as Error).message });
+    }
+    return true;
+  }
+
   // ── Machine ingest (token or user) ──
   if (method === 'POST' && path === '/ingest') {
     const ip = clientIp(req);
@@ -293,9 +325,20 @@ export async function handleApi(
 
     if (method === 'POST' && path === '/users') {
       try {
-        const b = await readBody(req) as { username?: string; password?: string; role?: Role };
-        const created = createUser(b.username ?? '', b.password ?? '', b.role === 'admin' ? 'admin' : 'user');
+        const b = await readBody(req) as { username?: string; password?: string; role?: Role; email?: string };
+        const created = createUser(b.username ?? '', b.password ?? '', b.role === 'admin' ? 'admin' : 'user', b.email);
         sendJson(res, 201, created);
+      } catch (e) {
+        sendJson(res, 400, { error: (e as Error).message });
+      }
+      return true;
+    }
+
+    const em = path.match(/^\/users\/([^/]+)\/email$/);
+    if (method === 'POST' && em) {
+      try {
+        const b = await readBody(req) as { email?: string };
+        sendJson(res, 200, setEmail(decodeURIComponent(em[1]), b.email ?? ''));
       } catch (e) {
         sendJson(res, 400, { error: (e as Error).message });
       }
