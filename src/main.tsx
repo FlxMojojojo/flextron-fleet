@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './tokens/tokens.css';
 import './index.css';
+import './tw.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { AppShell } from './components/shell/AppShell';
 import { FleetOverview } from './components/overview/FleetOverview';

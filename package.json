@@ -11,15 +11,21 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.101.0",
+    "@tanstack/react-table": "^8.21.3",
     "@vis.gl/react-google-maps": "^1.8.3",
     "better-sqlite3": "^12.11.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.33.0",
     "maplibre-gl": "^5.24.0",
     "nodemailer": "^9.0.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.18.0",
     "recharts": "^3.8.1",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
     "tsx": "^4.22.4"
   },
   "devDependencies": {

@@ -1,0 +1,27 @@
+/* Tailwind for the redesigned screens.
+   Deliberately NO preflight import — the rest of the app is CSS Modules with its
+   own reset (index.css), and we don't want base-style churn on legacy pages. */
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+@theme {
+  /* Brand palette (mirrors src/tokens/tokens.css) */
+  --color-ink: #0a1a2f;
+  --color-navy: #102a4c;
+  --color-blue: #1e5bff;
+  --color-cyan: #00a8e8;
+  --color-surf1: #eaf2ff;
+  --color-surf2: #f5f9ff;
+  --color-hair: #d4e2f7;
+  --color-good: #0e9f6e;
+  --color-goodbg: #ecfdf5;
+  --color-warn: #c2410c;
+  --color-warnbg: #fff1ee;
+  --color-amber: #b45711;
+  --color-muted: #6b7f9a;
+  --color-faint: #94a3b8;
+
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}

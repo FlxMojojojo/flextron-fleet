@@ -1,5 +1,6 @@
 import { defineConfig, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { handleApi, bootServices } from './server/api';
 
 /**
@@ -24,5 +25,5 @@ function fleetApiPlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), fleetApiPlugin()],
+  plugins: [react(), tailwindcss(), fleetApiPlugin()],
 });
