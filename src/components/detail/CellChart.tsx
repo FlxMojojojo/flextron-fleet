@@ -27,10 +27,27 @@ export function CellChart({ cells, cellDelta }: Props) {
     return '#1E5BFF';
   }
 
+  /** Two-line tick: cell number, with its current voltage underneath. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function CellTick({ x, y, payload }: any) {
+    const d = data[payload.index];
+    if (!d) return null;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text dy={10} textAnchor="middle" fontFamily="JetBrains Mono" fontSize={9} fill="#6B7F9A">
+          {d.cell}
+        </text>
+        <text dy={22} textAnchor="middle" fontFamily="JetBrains Mono" fontSize={8.5} fontWeight={600} fill={getColor(d)}>
+          {d.v.toFixed(3)}
+        </text>
+      </g>
+    );
+  }
+
   return (
-    <ResponsiveContainer width="100%" height={160}>
-      <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barSize={10}>
-        <XAxis dataKey="cell" tick={{ fontFamily: 'JetBrains Mono', fontSize: 9, fill: '#6B7F9A' }} />
+    <ResponsiveContainer width="100%" height={185}>
+      <BarChart data={data} margin={{ top: 4, right: 4, left: -16, bottom: 18 }} barSize={10}>
+        <XAxis dataKey="cell" interval={0} tick={<CellTick />} />
         <YAxis
           domain={[parseFloat((avg - 0.25).toFixed(2)), parseFloat((avg + 0.25).toFixed(2))]}
           tickCount={5}
