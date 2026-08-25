@@ -21,8 +21,9 @@ import { getOwnerByVehicle } from './owners';
 import {
   insertSample as dbInsert, backfill as dbBackfill,
   queryHistory as dbHistory, querySeries as dbSeries, querySnapshots as dbSnapshots, queryRich as dbRich,
-  deleteVehicleData as dbDelete,
+  queryRestInfo, deleteVehicleData as dbDelete,
 } from './db';
+import { packOcvSoc } from './ocv';
 
 /** Build the active-alert list for a vehicle, persist new ones to the audit
  *  log, and email the care team for each newly opened alert. */
@@ -695,13 +696,51 @@ export function deleteVehicle(id: string): boolean {
 export function getVehicles(): VehicleState[] {
   return Array.from(store.entries()).map(([id, rec]) => toVehicleState(id, rec));
 }
+const OCV_REST_MIN = 60;   // pack must be idle this long before OCV is valid
+const OCV_REST_AMPS = 2;   // |current| at/below this counts as "at rest"
+
 export function getVehicle(id: string): VehicleState | null {
   const rec = store.get(id);
   if (!rec) return null;
   const vs = toVehicleState(id, rec);
   // Reverse-geocode only for single-vehicle reads (the detail page).
   vs.address = reverseGeocode(rec.gps.latitude, rec.gps.longitude);
+  vs.ocv = computeOcv(id, rec, vs);
   return vs;
+}
+
+/**
+ * OCV-based SOC. Rest is measured up to the LATEST reading (can.ts), so an
+ * offline-but-previously-idle pack still yields a valid estimate for the
+ * moment of its last report.
+ */
+function computeOcv(id: string, rec: InternalRecord, vs: VehicleState) {
+  const readingTs = rec.can.ts;
+  const { lastActiveTs, earliestTs } = queryRestInfo(id, OCV_REST_AMPS);
+
+  let restingMin = 0;
+  if (lastActiveTs != null) restingMin = Math.max(0, Math.floor((readingTs - lastActiveTs) / 60_000));
+  else if (earliestTs != null) restingMin = Math.max(0, Math.floor((readingTs - earliestTs) / 60_000));
+
+  // The latest live reading itself must also be at rest.
+  const liveActive = rec.can.charging_status === 1 || Math.abs(rec.can.discharge_current) > OCV_REST_AMPS;
+  if (liveActive) restingMin = 0;
+
+  const temps = [rec.can.battery_temp_1, rec.can.battery_temp_2, rec.can.battery_temp_3, rec.can.battery_temp_4]
+    .filter(t => Number.isFinite(t) && t > -30 && t < 90);
+  const tempC = temps.length ? parseFloat((temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1)) : 25;
+
+  const rested = restingMin >= OCV_REST_MIN;
+  const est = rested ? packOcvSoc(vs.can.cell_voltages, tempC) : null;
+
+  return {
+    resting_min: restingMin,
+    required_min: OCV_REST_MIN,
+    soc: est ? parseFloat(est.soc.toFixed(1)) : null,
+    avg_cell_v: est ? est.avgCellV : null,
+    temp_c: tempC,
+    delta: est ? parseFloat((est.soc - vs.can.soc).toFixed(1)) : null,
+  };
 }
 
 /** GPS breadcrumb trail, derived from the stored history (after the last manual

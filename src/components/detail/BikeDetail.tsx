@@ -10,6 +10,7 @@ import { TelemetryChart } from './TelemetryChart';
 import { MiniMap } from './MiniMap';
 import { AlertLogCard } from './AlertLogCard';
 import { ExportButton } from './ExportButton';
+import { cn } from '../../lib/cn';
 import s from './BikeDetail.module.css';
 
 function fmt(ts: number) {
@@ -241,6 +242,74 @@ export function BikeDetail() {
           </div>
         </div>
       </section>
+
+      {/* SOC verification: BMS-reported vs OCV-derived (rested pack only) */}
+      {v.ocv && (() => {
+        const o = v.ocv;
+        const rested = o.soc != null;
+        const highDelta = o.delta != null && Math.abs(o.delta) >= 10;
+        return (
+          <section className={cn(
+            'rounded-2xl border bg-white p-5 font-body',
+            highDelta ? 'border-[#F3C0AE] shadow-[inset_3px_0_0_#C2410C]' : 'border-hair',
+          )}>
+            <h2 className="mb-4 flex flex-wrap items-center gap-2 font-display text-[15px] font-semibold text-ink">
+              SOC Verification (OCV)
+              {highDelta && (
+                <span className="rounded-full bg-warnbg px-2 py-0.5 text-[11px] font-semibold text-warn">
+                  ⚠ BMS SOC deviates {Math.abs(o.delta!).toFixed(1)}% from OCV — recalibration suspect
+                </span>
+              )}
+            </h2>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg bg-surf2 border border-hair px-4 py-3">
+                <div className="font-mono text-2xl font-semibold text-ink tabular-nums">{can.soc.toFixed(1)}<span className="text-sm text-faint"> %</span></div>
+                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">BMS SOC (device)</div>
+              </div>
+
+              <div className="rounded-lg bg-surf2 border border-hair px-4 py-3">
+                {rested ? (
+                  <div className="font-mono text-2xl font-semibold text-cyan tabular-nums">{o.soc!.toFixed(1)}<span className="text-sm text-faint"> %</span></div>
+                ) : (
+                  <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                )}
+                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">OCV SOC (rested)</div>
+              </div>
+
+              <div className="rounded-lg bg-surf2 border border-hair px-4 py-3">
+                {rested ? (
+                  <div className={cn('font-mono text-2xl font-semibold tabular-nums', highDelta ? 'text-warn' : 'text-good')}>
+                    {o.delta! > 0 ? '+' : ''}{o.delta!.toFixed(1)}<span className="text-sm text-faint"> %</span>
+                  </div>
+                ) : (
+                  <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                )}
+                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">Δ OCV − BMS</div>
+              </div>
+            </div>
+
+            {rested ? (
+              <p className="mt-3 text-[12px] text-muted">
+                Basis: avg cell <span className="font-mono text-ink">{o.avg_cell_v?.toFixed(3)} V</span> at{' '}
+                <span className="font-mono text-ink">{o.temp_c.toFixed(1)} °C</span>, pack at rest{' '}
+                <span className="font-mono text-ink">{Math.floor(o.resting_min / 60)}h {o.resting_min % 60}m</span>{' '}
+                · IFP28148115A-52Ah OCV table. LFP is flat between 30–95% SOC, so treat mid-range OCV as approximate.
+              </p>
+            ) : (
+              <div className="mt-3">
+                <div className="mb-1 flex justify-between text-[12px] text-muted">
+                  <span>OCV needs {o.required_min} min at rest (no charge/discharge)</span>
+                  <span className="font-mono tabular-nums">{Math.min(o.resting_min, o.required_min)}/{o.required_min} min</span>
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-hair">
+                  <div className="h-full rounded-full bg-cyan" style={{ width: `${Math.min(100, (o.resting_min / o.required_min) * 100)}%` }} />
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Temperature sensors */}
       <section className={s.card}>

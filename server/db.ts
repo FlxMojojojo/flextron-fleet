@@ -169,6 +169,22 @@ export function queryRich(vehicleno: string, from?: number, to?: number, limit =
   }));
 }
 
+/**
+ * Rest info for OCV-SOC: when was the pack last "active" (charging or drawing
+ * more than restAmps), and do we have enough recent samples to trust it.
+ */
+export function queryRestInfo(vehicleno: string, restAmps = 2): {
+  lastActiveTs: number | null; earliestTs: number | null; samplesLastHour: number;
+} {
+  const now = Date.now();
+  const a = db.prepare(
+    `SELECT ts FROM telemetry WHERE vehicleno=? AND (charging_status=1 OR ABS(discharge_current)>?) ORDER BY ts DESC LIMIT 1`,
+  ).get(vehicleno, restAmps) as { ts: number } | undefined;
+  const e = db.prepare('SELECT MIN(ts) t FROM telemetry WHERE vehicleno=?').get(vehicleno) as { t: number | null };
+  const c = db.prepare('SELECT COUNT(*) n FROM telemetry WHERE vehicleno=? AND ts>=?').get(vehicleno, now - 3_600_000) as { n: number };
+  return { lastActiveTs: a?.ts ?? null, earliestTs: e?.t ?? null, samplesLastHour: c.n };
+}
+
 export function deleteVehicleData(vehicleno: string): void {
   try { db.prepare('DELETE FROM telemetry WHERE vehicleno=?').run(vehicleno); } catch { /* ignore */ }
 }

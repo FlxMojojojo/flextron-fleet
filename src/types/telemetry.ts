@@ -75,6 +75,17 @@ export interface VehicleState {
   fault_bytes?: number[];            // raw 8-byte fault frame as received
   firmware_version?: string;         // device firmware version
   imei?: string;                     // device modem IMEI
+  ocv?: OcvEstimate;                 // OCV-based SOC (single-vehicle reads)
+}
+
+/** OCV-derived SOC estimate — only valid once the pack has rested ≥1 h. */
+export interface OcvEstimate {
+  resting_min: number;      // minutes since last charge/discharge activity
+  required_min: number;     // rest needed before OCV is valid (60)
+  soc: number | null;       // OCV SOC %, null until rested
+  avg_cell_v: number | null;// basis: average of real cell voltages
+  temp_c: number;           // pack temperature used for the lookup
+  delta: number | null;     // ocv soc − BMS-reported soc
 }
 
 export interface TimeSeriesPoint {
