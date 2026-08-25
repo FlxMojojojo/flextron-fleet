@@ -86,6 +86,7 @@ export interface OcvEstimate {
   avg_cell_v: number | null;// basis: average of real cell voltages
   temp_c: number;           // pack temperature used for the lookup
   delta: number | null;     // ocv soc − BMS-reported soc
+  gap_credited?: boolean;   // rest includes a telemetry gap verified idle via unchanged SOC/GPS/cycles
 }
 
 export interface TimeSeriesPoint {

@@ -170,19 +170,18 @@ export function queryRich(vehicleno: string, from?: number, to?: number, limit =
 }
 
 /**
- * Rest info for OCV-SOC: when was the pack last "active" (charging or drawing
- * more than restAmps), and do we have enough recent samples to trust it.
+ * Samples needed for OCV rest verification, newest first. Includes the fields
+ * used to corroborate data gaps (soc delta, gps movement, cycle count).
  */
-export function queryRestInfo(vehicleno: string, restAmps = 2): {
-  lastActiveTs: number | null; earliestTs: number | null; samplesLastHour: number;
-} {
-  const now = Date.now();
-  const a = db.prepare(
-    `SELECT ts FROM telemetry WHERE vehicleno=? AND (charging_status=1 OR ABS(discharge_current)>?) ORDER BY ts DESC LIMIT 1`,
-  ).get(vehicleno, restAmps) as { ts: number } | undefined;
-  const e = db.prepare('SELECT MIN(ts) t FROM telemetry WHERE vehicleno=?').get(vehicleno) as { t: number | null };
-  const c = db.prepare('SELECT COUNT(*) n FROM telemetry WHERE vehicleno=? AND ts>=?').get(vehicleno, now - 3_600_000) as { n: number };
-  return { lastActiveTs: a?.ts ?? null, earliestTs: e?.t ?? null, samplesLastHour: c.n };
+export interface RestSample {
+  ts: number; soc: number; charging_status: number; discharge_current: number;
+  lat: number | null; lng: number | null; cycle_count: number;
+}
+export function queryRestSamples(vehicleno: string, sinceTs: number): RestSample[] {
+  return db.prepare(
+    `SELECT ts, soc, charging_status, discharge_current, lat, lng, cycle_count
+     FROM telemetry WHERE vehicleno=? AND ts>=? ORDER BY ts DESC LIMIT 5000`,
+  ).all(vehicleno, sinceTs) as RestSample[];
 }
 
 export function deleteVehicleData(vehicleno: string): void {

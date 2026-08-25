@@ -21,7 +21,7 @@ import { getOwnerByVehicle } from './owners';
 import {
   insertSample as dbInsert, backfill as dbBackfill,
   queryHistory as dbHistory, querySeries as dbSeries, querySnapshots as dbSnapshots, queryRich as dbRich,
-  queryRestInfo, deleteVehicleData as dbDelete,
+  queryRestSamples, deleteVehicleData as dbDelete,
 } from './db';
 import { packOcvSoc } from './ocv';
 
@@ -725,18 +725,51 @@ export function getVehicle(id: string): VehicleState | null {
   return vs;
 }
 
+// Rest-verification tolerances
+const OCV_GAP_TOL_MS = 15 * 60_000; // sample gaps beyond this need corroboration
+const OCV_GAP_SOC_TOL = 1.5;        // BMS SOC may drift this much across a gap and still count as rest
+const OCV_GAP_MOVE_M = 100;         // GPS movement beyond this across a gap = ridden
+
 /**
- * OCV-based SOC. Rest is measured up to the LATEST reading (can.ts), so an
- * offline-but-previously-idle pack still yields a valid estimate for the
- * moment of its last report.
+ * OCV-based SOC. Rest is measured up to the LATEST reading (can.ts) and must
+ * be OBSERVED: we walk the archive backwards and only count time covered by
+ * idle samples. A telemetry gap (tracker offline) breaks the rest clock unless
+ * the gap is corroborated as idle — unchanged BMS SOC, unchanged GPS position,
+ * unchanged cycle count across the gap (a ride would consume SOC / move GPS).
  */
 function computeOcv(id: string, rec: InternalRecord, vs: VehicleState) {
   const readingTs = rec.can.ts;
-  const { lastActiveTs, earliestTs } = queryRestInfo(id, OCV_REST_AMPS);
+  const samples = queryRestSamples(id, readingTs - 7 * 86_400_000).filter(r => r.ts <= readingTs);
 
-  let restingMin = 0;
-  if (lastActiveTs != null) restingMin = Math.max(0, Math.floor((readingTs - lastActiveTs) / 60_000));
-  else if (earliestTs != null) restingMin = Math.max(0, Math.floor((readingTs - earliestTs) / 60_000));
+  let anchor = readingTs;      // rest began at this ts (walked backwards)
+  let gapCredited = false;
+  let prev: (typeof samples)[number] | null = null; // the newer sample as we walk back
+
+  for (const row of samples) {
+    const active = row.charging_status === 1 || Math.abs(row.discharge_current) > OCV_REST_AMPS;
+    if (active) { anchor = row.ts; break; } // pack was in use here — rest starts after this
+
+    if (prev) {
+      const gap = prev.ts - row.ts;
+      if (gap > OCV_GAP_TOL_MS) {
+        // Unobserved window: corroborate or reset the clock to the post-gap sample.
+        const socOk = Math.abs(prev.soc - row.soc) <= OCV_GAP_SOC_TOL;
+        const cycOk = !(Number.isFinite(prev.cycle_count) && Number.isFinite(row.cycle_count)) || prev.cycle_count === row.cycle_count;
+        const gpsOk = prev.lat == null || row.lat == null || prev.lng == null || row.lng == null
+          || haversineKm(prev.lat, prev.lng, row.lat, row.lng) * 1000 <= OCV_GAP_MOVE_M;
+        if (socOk && cycOk && gpsOk) {
+          gapCredited = true;   // nothing consumed energy or moved — credit the gap as rest
+        } else {
+          anchor = prev.ts;     // can't prove rest across the gap — clock starts after it
+          break;
+        }
+      }
+    }
+    anchor = row.ts;
+    prev = row;
+  }
+
+  let restingMin = Math.max(0, Math.floor((readingTs - anchor) / 60_000));
 
   // The latest live reading itself must also be at rest.
   const liveActive = rec.can.charging_status === 1 || Math.abs(rec.can.discharge_current) > OCV_REST_AMPS;
@@ -756,6 +789,7 @@ function computeOcv(id: string, rec: InternalRecord, vs: VehicleState) {
     avg_cell_v: est ? est.avgCellV : null,
     temp_c: tempC,
     delta: est ? parseFloat((est.soc - vs.can.soc).toFixed(1)) : null,
+    gap_credited: gapCredited || undefined,
   };
 }
 

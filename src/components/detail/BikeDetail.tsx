@@ -294,7 +294,10 @@ export function BikeDetail() {
                 Basis: avg cell <span className="font-mono text-ink">{o.avg_cell_v?.toFixed(3)} V</span> at{' '}
                 <span className="font-mono text-ink">{o.temp_c.toFixed(1)} °C</span>, pack at rest{' '}
                 <span className="font-mono text-ink">{Math.floor(o.resting_min / 60)}h {o.resting_min % 60}m</span>{' '}
-                · IFP28148115A-52Ah OCV table. LFP is flat between 30–95% SOC, so treat mid-range OCV as approximate.
+                · datasheet A.4 OCV table. LFP is flat between 30–95% SOC, so treat mid-range OCV as approximate.
+                {o.gap_credited && (
+                  <> Rest includes an offline gap verified idle (SOC, GPS &amp; cycle count unchanged across it).</>
+                )}
               </p>
             ) : (
               <div className="mt-3">
