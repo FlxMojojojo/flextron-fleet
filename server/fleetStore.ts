@@ -693,8 +693,24 @@ export function deleteVehicle(id: string): boolean {
 }
 
 // ── Read API ─────────────────────────────────────────────
+// Fleet list is polled every ~3 s; cache each vehicle's OCV (needs DB lookups)
+// briefly so the poll stays cheap. Rest state changes on minute timescales.
+const ocvCache = new Map<string, { ts: number; ocv: VehicleState['ocv'] }>();
+const OCV_CACHE_MS = 30_000;
+
 export function getVehicles(): VehicleState[] {
-  return Array.from(store.entries()).map(([id, rec]) => toVehicleState(id, rec));
+  const now = Date.now();
+  return Array.from(store.entries()).map(([id, rec]) => {
+    const vs = toVehicleState(id, rec);
+    const hit = ocvCache.get(id);
+    if (hit && now - hit.ts < OCV_CACHE_MS) {
+      vs.ocv = hit.ocv;
+    } else {
+      vs.ocv = computeOcv(id, rec, vs);
+      ocvCache.set(id, { ts: now, ocv: vs.ocv });
+    }
+    return vs;
+  });
 }
 const OCV_REST_MIN = 60;   // pack must be idle this long before OCV is valid
 const OCV_REST_AMPS = 2;   // |current| at/below this counts as "at rest"

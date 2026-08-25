@@ -93,6 +93,34 @@ const columns = [
       );
     },
   }),
+  col.accessor(v => v.ocv?.soc ?? -1, {
+    id: 'ocv',
+    header: 'OCV SOC',
+    cell: info => {
+      const o = info.row.original.ocv;
+      if (!o || o.soc == null) {
+        return (
+          <span className="font-mono text-[11px] text-faint" title={o ? `Pack must rest 60 min · currently ${Math.min(o.resting_min, o.required_min)}/60 min` : undefined}>
+            {o && o.resting_min > 0 ? `rest ${Math.min(o.resting_min, 60)}/60m` : '—'}
+          </span>
+        );
+      }
+      const high = o.delta != null && Math.abs(o.delta) >= 10;
+      return (
+        <span
+          className={cn('font-mono text-[12px] tabular-nums', high ? 'font-semibold text-warn' : 'text-cyan')}
+          title={`Avg cell ${o.avg_cell_v?.toFixed(3)} V @ ${o.temp_c}°C · rested ${Math.floor(o.resting_min / 60)}h${o.resting_min % 60}m`}
+        >
+          {o.soc.toFixed(1)}%
+          {o.delta != null && (
+            <span className={cn('ml-1 text-[10.5px]', high ? 'text-warn' : 'text-faint')}>
+              {high && '⚠'}Δ{o.delta > 0 ? '+' : ''}{o.delta.toFixed(1)}
+            </span>
+          )}
+        </span>
+      );
+    },
+  }),
   col.accessor('cell_delta', {
     header: 'Cell Δ',
     cell: info => (
@@ -273,6 +301,7 @@ export function FleetOverview() {
                         'select-none px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-wider text-muted',
                         h.column.getCanSort() && 'cursor-pointer hover:text-ink',
                         h.column.id === 'owner' && 'hidden sm:table-cell',
+                        h.column.id === 'ocv' && 'hidden lg:table-cell',
                         h.column.id === 'cell_delta' && 'hidden xl:table-cell',
                       )}
                     >
@@ -313,6 +342,7 @@ export function FleetOverview() {
                         className={cn(
                           'px-3 py-[7px] whitespace-nowrap',
                           c.column.id === 'owner' && 'hidden sm:table-cell',
+                          c.column.id === 'ocv' && 'hidden lg:table-cell',
                           c.column.id === 'cell_delta' && 'hidden xl:table-cell',
                           c.column.id === 'open' && 'w-8 text-right',
                         )}
