@@ -91,6 +91,7 @@ interface InternalRecord {
   faultBytes?: number[];       // raw 8-byte fault frame (0x040980)
   firmwareVersion?: string;    // device firmware version
   imei?: string;               // device modem IMEI
+  lastOcv?: { ts: number; soc: number; delta: number; avg_cell_v: number; temp_c: number }; // last valid OCV reading
   gpsPath?: { ts: number; lat: number; lng: number }[]; // breadcrumb trail
   pathResetTs?: number;        // path points before this are hidden (manual reset)
   // Batch sync / cumulative-ACK tracking (ESP32 offline buffering)
@@ -782,6 +783,18 @@ function computeOcv(id: string, rec: InternalRecord, vs: VehicleState) {
   const rested = restingMin >= OCV_REST_MIN;
   const est = rested ? packOcvSoc(vs.can.cell_voltages, tempC) : null;
 
+  // Remember the last VALID reading so it stays visible after rest resets.
+  if (est) {
+    rec.lastOcv = {
+      ts: readingTs,
+      soc: parseFloat(est.soc.toFixed(1)),
+      delta: parseFloat((est.soc - vs.can.soc).toFixed(1)),
+      avg_cell_v: est.avgCellV,
+      temp_c: tempC,
+    };
+    // Persisted with the regular 30 s snapshot checkpoint — no extra write here.
+  }
+
   return {
     resting_min: restingMin,
     required_min: OCV_REST_MIN,
@@ -790,6 +803,7 @@ function computeOcv(id: string, rec: InternalRecord, vs: VehicleState) {
     temp_c: tempC,
     delta: est ? parseFloat((est.soc - vs.can.soc).toFixed(1)) : null,
     gap_credited: gapCredited || undefined,
+    last: rec.lastOcv,
   };
 }
 

@@ -270,22 +270,46 @@ export function BikeDetail() {
 
               <div className="rounded-lg bg-surf2 border border-hair px-4 py-3">
                 {rested ? (
-                  <div className="font-mono text-2xl font-semibold text-cyan tabular-nums">{o.soc!.toFixed(1)}<span className="text-sm text-faint"> %</span></div>
+                  <>
+                    <div className="font-mono text-2xl font-semibold text-cyan tabular-nums">{o.soc!.toFixed(1)}<span className="text-sm text-faint"> %</span></div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">OCV SOC (rested)</div>
+                  </>
+                ) : o.last ? (
+                  <>
+                    <div className="font-mono text-2xl font-semibold text-faint tabular-nums">{o.last.soc.toFixed(1)}<span className="text-sm text-faint"> %</span></div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">
+                      Last OCV · <span className="font-mono normal-case">{new Date(o.last.ts).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  </>
                 ) : (
-                  <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                  <>
+                    <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">OCV SOC (rested)</div>
+                  </>
                 )}
-                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">OCV SOC (rested)</div>
               </div>
 
               <div className="rounded-lg bg-surf2 border border-hair px-4 py-3">
                 {rested ? (
-                  <div className={cn('font-mono text-2xl font-semibold tabular-nums', highDelta ? 'text-warn' : 'text-good')}>
-                    {o.delta! > 0 ? '+' : ''}{o.delta!.toFixed(1)}<span className="text-sm text-faint"> %</span>
-                  </div>
+                  <>
+                    <div className={cn('font-mono text-2xl font-semibold tabular-nums', highDelta ? 'text-warn' : 'text-good')}>
+                      {o.delta! > 0 ? '+' : ''}{o.delta!.toFixed(1)}<span className="text-sm text-faint"> %</span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">Δ OCV − BMS</div>
+                  </>
+                ) : o.last ? (
+                  <>
+                    <div className={cn('font-mono text-2xl font-semibold tabular-nums', Math.abs(o.last.delta) >= 10 ? 'text-warn/70' : 'text-faint')}>
+                      {o.last.delta > 0 ? '+' : ''}{o.last.delta.toFixed(1)}<span className="text-sm text-faint"> %</span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">Δ at last OCV</div>
+                  </>
                 ) : (
-                  <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                  <>
+                    <div className="font-mono text-2xl font-semibold text-faint">—</div>
+                    <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">Δ OCV − BMS</div>
+                  </>
                 )}
-                <div className="mt-0.5 text-[11px] uppercase tracking-wider text-muted">Δ OCV − BMS</div>
               </div>
             </div>
 

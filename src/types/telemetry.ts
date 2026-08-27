@@ -87,6 +87,8 @@ export interface OcvEstimate {
   temp_c: number;           // pack temperature used for the lookup
   delta: number | null;     // ocv soc − BMS-reported soc
   gap_credited?: boolean;   // rest includes a telemetry gap verified idle via unchanged SOC/GPS/cycles
+  /** Most recent valid OCV reading — shown after the rest clock resets. */
+  last?: { ts: number; soc: number; delta: number; avg_cell_v: number; temp_c: number };
 }
 
 export interface TimeSeriesPoint {
